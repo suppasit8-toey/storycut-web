@@ -72,3 +72,13 @@ export const addBooking = async (bookingData) => {
         throw e;
     }
 };
+
+export const getBookings = async () => {
+    try {
+        const querySnapshot = await getDocs(collection(db, "bookings"));
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (e) {
+        console.error("Error getting bookings: ", e);
+        throw e;
+    }
+};

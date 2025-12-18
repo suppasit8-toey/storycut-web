@@ -3,14 +3,20 @@ import { useState, useEffect } from 'react';
 import { getBarbers } from '@/lib/db';
 import Link from 'next/link';
 
+interface Barber {
+  id: string;
+  name: string;
+  nickname?: string;
+}
+
 export default function Home() {
-  const [barbers, setBarbers] = useState<any[]>([]);
+  const [barbers, setBarbers] = useState<Barber[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const data = await getBarbers();
-        setBarbers(data);
+        setBarbers(data as Barber[]);
       } catch (error) {
         console.error("Failed to fetch barbers", error);
       }
