@@ -172,12 +172,15 @@ export default function BookingPage() {
                 barberId: selectedBarber.id,
                 barberName: selectedBarber.name,
                 serviceId: selectedService.id,
-                serviceName: selectedService.title, // Added for convenience if schema supports
+                serviceName: selectedService.title,
+                date: selectedDate.toLocaleDateString(),
+                time: selectedTime,
                 dateTime: dateTimeString,
                 customerName: name,
                 phone,
                 slipUrl,
-                price: selectedService.price
+                price: selectedService.price,
+                status: "pending"
             });
 
             setStep(5); // Success Step
