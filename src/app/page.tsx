@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getBarbers, getServices, addBooking, getBookingsByBarberAndDate, getBarberPricesForService } from "@/lib/db";
+import { formatDateDDMMYYYY } from "@/utils/dateUtils";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import {
   ChevronRight,
   Check,
@@ -18,6 +21,9 @@ import { twMerge } from "tailwind-merge";
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+// Shop operating hours (10:00 - 21:00)
+const SHOP_HOURS = Array.from({ length: 12 }, (_, i) => `${10 + i}:00`);
 
 // --- Types ---
 interface Barber {
@@ -135,15 +141,51 @@ export default function Home() {
     fetchData();
   }, []);
 
-  // Rule 1: Fetch Booked Slots
+  // Rule 1: Fetch Booked Slots and Leave Requests
   const fetchBookings = useCallback(async () => {
     if (selectedBarber && selectedDate) {
       setIsFetchingSlots(true);
       try {
-        const dateStr = selectedDate.toLocaleDateString();
-        const bookings = await getBookingsByBarberAndDate(selectedBarber.id, dateStr) as any[];
+        const dateStr = formatDateDDMMYYYY(selectedDate);
+
+        // Fetch both bookings and leave requests
+        const [bookings, leaveRequestsSnapshot] = await Promise.all([
+          getBookingsByBarberAndDate(selectedBarber.id, dateStr) as Promise<any[]>,
+          getDocs(query(
+            collection(db, "leave_requests"),
+            where("barberId", "==", selectedBarber.id),
+            where("date", "==", dateStr)
+          ))
+        ]);
+
+        const leaveRequests = leaveRequestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
         setExistingBookings(bookings);
-        setBookedSlots(bookings.map(b => b.time));
+
+        // Block slots for bookings
+        const blockedSlots = new Set(bookings.map(b => b.time));
+
+        // Block slots for leave requests
+        leaveRequests.forEach((req: any) => {
+          if (req.status === 'approved' || req.status === 'pending') {
+            if (req.type === 'leave') {
+              // Block all slots for full day leave
+              SHOP_HOURS.forEach(hour => blockedSlots.add(hour));
+            } else if (req.type === 'break' && req.startTime) {
+              // Block slots based on duration
+              const duration = req.durationHrs || 1;
+              const startHour = parseInt(req.startTime.split(':')[0]);
+              for (let i = 0; i < duration; i++) {
+                const hour = startHour + i;
+                if (hour >= 10 && hour <= 21) {
+                  blockedSlots.add(`${hour}:00`);
+                }
+              }
+            }
+          }
+        });
+
+        setBookedSlots(Array.from(blockedSlots));
       } catch (error) {
         console.error("Error fetching booked slots:", error);
       } finally {
@@ -266,7 +308,7 @@ export default function Home() {
         slipUrl = data.secure_url;
       }
 
-      const dateStr = selectedDate.toLocaleDateString();
+      const dateStr = formatDateDDMMYYYY(selectedDate);
       const dateTimeString = `${dateStr} ${selectedTime}`;
       const finalPrice = selectedBarber ? (barberPricingMap[selectedBarber.id]?.price_promo || barberPricingMap[selectedBarber.id]?.price_normal || selectedService.price_promo || selectedService.base_price) : (selectedService.price_promo || selectedService.base_price);
 

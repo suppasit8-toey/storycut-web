@@ -259,26 +259,26 @@ export default function BarbersPage() {
     );
 
     return (
-        <div className="p-8 max-w-[1600px] mx-auto">
-            <header className="mb-10 flex justify-between items-end">
+        <div className="p-4 md:p-8 max-w-[1600px] mx-auto">
+            <header className="mb-8 md:mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
                 <div>
-                    <h1 className="text-4xl font-black text-gray-900 mb-2 tracking-tighter italic uppercase">Barber HQ</h1>
-                    <p className="text-gray-500 font-medium">บริหารจัดการช่างและตั้งค่าระบบค่าตอบแทนรายบุคคล</p>
+                    <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-2 tracking-tighter italic uppercase">Barber HQ</h1>
+                    <p className="text-xs md:text-sm text-gray-500 font-medium">บริหารจัดการช่างและตั้งค่าระบบค่าตอบแทนรายบุคคล</p>
                 </div>
-                <div className="flex gap-4">
-                    <div className="relative">
+                <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+                    <div className="relative flex-1 sm:w-80">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <input
                             type="text"
                             placeholder="ค้นหาช่าง..."
-                            className="pl-12 pr-6 py-4 bg-white border border-gray-100 rounded-[28px] w-80 shadow-sm focus:ring-4 focus:ring-black/5 outline-none transition-all font-bold"
+                            className="pl-12 pr-6 py-4 bg-white border border-gray-100 rounded-[24px] md:rounded-[28px] w-full shadow-sm focus:ring-4 focus:ring-black/5 outline-none transition-all font-bold text-sm"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                     </div>
                     <button
                         onClick={() => handleOpenModal()}
-                        className="bg-black text-white px-8 py-4 rounded-[28px] font-black text-[11px] uppercase tracking-widest flex items-center gap-3 hover:bg-gray-800 transition-all active:scale-95 shadow-xl shadow-black/10"
+                        className="bg-black text-white px-8 py-4 rounded-[24px] md:rounded-[28px] font-black text-[10px] md:text-[11px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-gray-800 transition-all active:scale-95 shadow-xl shadow-black/10 h-[56px]"
                     >
                         <Plus className="w-4 h-4" /> Add Master Barber
                     </button>
@@ -291,7 +291,7 @@ export default function BarbersPage() {
                     <p className="font-black text-gray-300 uppercase tracking-[0.4em] text-[10px]">Synchronizing Database...</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
                     {filteredBarbers.map((barber) => (
                         <div key={barber.id} className="bg-white rounded-[48px] border border-gray-100 p-8 shadow-sm hover:shadow-2xl transition-all group relative overflow-hidden flex flex-col items-center text-center cursor-pointer" onClick={() => handleOpenModal(barber)}>
                             <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-100 transition-all">
@@ -362,22 +362,22 @@ export default function BarbersPage() {
 
             {/* Advanced Tabbed Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
+                <div className="fixed inset-0 z-[70] flex items-end md:items-center justify-center md:p-6">
                     <div className="absolute inset-0 bg-black/80 backdrop-blur-xl" onClick={() => setIsModalOpen(false)} />
                     <form
                         onSubmit={handleSaveAll}
-                        className="relative w-full max-w-4xl bg-white rounded-[56px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500 flex flex-col max-h-[90vh]"
+                        className="relative w-full md:max-w-4xl bg-white rounded-t-[40px] md:rounded-[56px] shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full md:slide-in-from-bottom-0 md:zoom-in-95 duration-500 flex flex-col h-[95vh] md:max-h-[90vh]"
                     >
                         {/* Header / Tabs */}
-                        <div className="px-10 py-8 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-                            <div className="flex items-center gap-10">
-                                <h2 className="text-2xl font-black italic tracking-tighter uppercase">{editingBarber ? "Manage Master" : "Recruit Staff"}</h2>
-                                <nav className="flex bg-white p-1 rounded-2xl border border-gray-100">
+                        <div className="px-6 md:px-10 py-6 md:py-8 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row justify-between items-center gap-4 md:gap-0">
+                            <div className="flex flex-col md:flex-row items-center gap-4 md:gap-10 w-full md:w-auto">
+                                <h2 className="text-xl md:text-2xl font-black italic tracking-tighter uppercase">{editingBarber ? "Manage Master" : "Recruit Staff"}</h2>
+                                <nav className="flex bg-white p-1 rounded-2xl border border-gray-100 w-full md:w-auto">
                                     <button
                                         type="button"
                                         onClick={() => setActiveTab("profile")}
                                         className={cn(
-                                            "px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                                            "flex-1 md:flex-none px-4 md:px-6 py-2.5 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all",
                                             activeTab === "profile" ? "bg-black text-white shadow-xl shadow-black/20" : "text-gray-400 hover:text-gray-600"
                                         )}
                                     >
@@ -387,7 +387,7 @@ export default function BarbersPage() {
                                         type="button"
                                         onClick={() => setActiveTab("services")}
                                         className={cn(
-                                            "px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                                            "flex-1 md:flex-none px-4 md:px-6 py-2.5 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all",
                                             activeTab === "services" ? "bg-black text-white shadow-xl shadow-black/20" : "text-gray-400 hover:text-gray-600"
                                         )}
                                     >
@@ -395,16 +395,16 @@ export default function BarbersPage() {
                                     </button>
                                 </nav>
                             </div>
-                            <button type="button" onClick={() => setIsModalOpen(false)} className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg hover:rotate-90 transition-all border border-gray-100">
-                                <X className="w-6 h-6" />
+                            <button type="button" onClick={() => setIsModalOpen(false)} className="absolute top-6 right-6 md:relative md:top-0 md:right-0 w-10 h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center shadow-lg hover:rotate-90 transition-all border border-gray-100">
+                                <X className="w-5 h-5 md:w-6 md:h-6" />
                             </button>
                         </div>
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
                             {activeTab === "profile" ? (
-                                <div className="p-10 space-y-10 animate-in fade-in slide-in-from-left-4 duration-500">
-                                    <div className="grid grid-cols-12 gap-10">
-                                        <div className="col-span-4 flex flex-col items-center">
+                                <div className="p-6 md:p-10 space-y-8 md:space-y-10 animate-in fade-in slide-in-from-left-4 duration-500">
+                                    <div className="flex flex-col lg:grid lg:grid-cols-12 gap-8 md:gap-10">
+                                        <div className="lg:col-span-4 flex flex-col items-center">
                                             {process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ? (
                                                 <CldUploadWidget
                                                     uploadPreset="storycut_uploads"
@@ -446,8 +446,8 @@ export default function BarbersPage() {
                                             <p className="text-[9px] font-black text-gray-300 mt-4 uppercase tracking-[0.2em] italic">Portfolio Masterpiece</p>
                                         </div>
 
-                                        <div className="col-span-8 space-y-8">
-                                            <div className="grid grid-cols-2 gap-6">
+                                        <div className="lg:col-span-8 space-y-6 md:space-y-8">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 <div className="space-y-2">
                                                     <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] px-1">ชื่อไทย (Thai Name)</label>
                                                     <input
@@ -472,7 +472,7 @@ export default function BarbersPage() {
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-2 gap-6">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 <div className="space-y-2">
                                                     <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] px-1">Nickname</label>
                                                     <input
@@ -501,19 +501,19 @@ export default function BarbersPage() {
 
                                     <div className="h-px bg-gray-100" />
 
-                                    <div className="grid grid-cols-2 gap-20">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-20">
                                         <div className="space-y-6">
                                             <label className="text-[10px] font-black text-gray-900 uppercase tracking-[0.3em] flex items-center gap-3">
                                                 <Calendar className="w-4 h-4" /> Weekly Off Days
                                             </label>
-                                            <div className="flex justify-between items-center max-w-sm">
+                                            <div className="flex justify-between items-center max-w-sm gap-2">
                                                 {THAI_DAYS.map((day, idx) => (
                                                     <button
                                                         key={idx}
                                                         type="button"
                                                         onClick={() => handleToggleOffDay(idx)}
                                                         className={cn(
-                                                            "w-12 h-12 rounded-full font-black text-[12px] transition-all flex items-center justify-center border-2",
+                                                            "w-10 h-10 md:w-12 md:h-12 rounded-full font-black text-[10px] md:text-[12px] transition-all flex items-center justify-center border-2",
                                                             formData.weekly_off_days.includes(idx)
                                                                 ? "bg-black text-white border-black shadow-xl shadow-black/20 scale-110"
                                                                 : "bg-white text-gray-300 border-gray-100 hover:border-gray-300"
@@ -534,6 +534,7 @@ export default function BarbersPage() {
                                                 <Lock className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-200 group-focus-within:text-black transition-colors" />
                                                 <input
                                                     type="password"
+                                                    inputMode="numeric"
                                                     maxLength={4}
                                                     required
                                                     placeholder="4-Digit PIN"
@@ -549,7 +550,7 @@ export default function BarbersPage() {
                                                         type="button"
                                                         onClick={() => setFormData({ ...formData, status: s as any })}
                                                         className={cn(
-                                                            "px-8 py-2.5 rounded-full text-[9px] font-black uppercase tracking-[0.2em] transition-all border",
+                                                            "flex-1 md:flex-none px-4 md:px-8 py-4 rounded-full text-[9px] font-black uppercase tracking-[0.2em] transition-all border h-[48px] flex items-center justify-center",
                                                             formData.status === s ? "bg-green-500 text-white border-green-500" : "bg-white text-gray-300 border-gray-100 hover:bg-gray-50"
                                                         )}
                                                     >
@@ -561,7 +562,7 @@ export default function BarbersPage() {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="p-10 space-y-4 animate-in fade-in slide-in-from-right-4 duration-500">
+                                <div className="p-6 md:p-10 space-y-4 animate-in fade-in slide-in-from-right-4 duration-500">
                                     {isMappingLoading ? (
                                         <div className="flex flex-col items-center justify-center py-32 gap-6 grayscale">
                                             <Loader2 className="w-10 h-10 text-black animate-spin" />
@@ -572,15 +573,15 @@ export default function BarbersPage() {
                                         if (!state) return null;
                                         return (
                                             <div key={service.id} className={cn(
-                                                "p-8 rounded-[40px] border-2 transition-all flex items-center gap-10",
+                                                "p-6 md:p-8 rounded-[32px] md:rounded-[40px] border-2 transition-all flex flex-col lg:flex-row items-start lg:items-center gap-6 lg:gap-10",
                                                 state.enabled ? "bg-white border-black shadow-2xl" : "bg-gray-50/50 border-gray-100 grayscale opacity-40 shadow-none border-dashed"
                                             )}>
-                                                <div className="flex items-center gap-6 flex-1">
+                                                <div className="flex items-center gap-6 flex-1 w-full">
                                                     <button
                                                         type="button"
                                                         onClick={() => handleToggleMapping(service.id)}
                                                         className={cn(
-                                                            "w-16 h-10 rounded-full relative p-1.5 transition-all outline-none",
+                                                            "w-16 h-10 rounded-full relative p-1.5 transition-all outline-none flex-shrink-0",
                                                             state.enabled ? "bg-black" : "bg-gray-200"
                                                         )}
                                                     >
@@ -589,14 +590,14 @@ export default function BarbersPage() {
                                                             state.enabled ? "translate-x-6" : "translate-x-0"
                                                         )} />
                                                     </button>
-                                                    <div>
-                                                        <h4 className="font-black text-xl italic tracking-tight">{service.name_th}</h4>
+                                                    <div className="min-w-0">
+                                                        <h4 className="font-black text-lg md:text-xl italic tracking-tight truncate">{service.name_th}</h4>
                                                         <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Base Price: ฿{service.base_price}</p>
                                                     </div>
                                                 </div>
 
                                                 {state.enabled && (
-                                                    <div className="flex items-center gap-6 animate-in zoom-in-95 duration-300">
+                                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 w-full lg:w-auto animate-in zoom-in-95 duration-300">
                                                         <div className="space-y-1.5">
                                                             <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest px-1">Normal Price</label>
                                                             <input
@@ -604,7 +605,7 @@ export default function BarbersPage() {
                                                                 disabled={!state.enabled}
                                                                 value={state.price_normal}
                                                                 onChange={e => handleUpdateMappingField(service.id, "price_normal", e.target.value)}
-                                                                className="w-32 bg-gray-50 disabled:bg-gray-100/50 border-transparent focus:bg-white focus:ring-4 focus:ring-black/5 rounded-2xl px-5 py-3 text-sm font-black outline-none transition-all"
+                                                                className="w-full lg:w-32 bg-gray-50 disabled:bg-gray-100/50 border-transparent focus:bg-white focus:ring-4 focus:ring-black/5 rounded-2xl px-5 py-3 text-sm font-black outline-none transition-all"
                                                             />
                                                         </div>
                                                         <div className="space-y-1.5">
@@ -614,11 +615,11 @@ export default function BarbersPage() {
                                                                 disabled={!state.enabled}
                                                                 value={state.price_promo || ""}
                                                                 onChange={e => handleUpdateMappingField(service.id, "price_promo", e.target.value)}
-                                                                className="w-32 bg-gray-50 disabled:bg-gray-100/50 border-transparent focus:bg-white focus:ring-4 focus:ring-black/5 rounded-2xl px-5 py-3 text-sm font-black outline-none transition-all italic text-red-500"
+                                                                className="w-full lg:w-32 bg-gray-50 disabled:bg-gray-100/50 border-transparent focus:bg-white focus:ring-4 focus:ring-black/5 rounded-2xl px-5 py-3 text-sm font-black outline-none transition-all italic text-red-500"
                                                                 placeholder="None"
                                                             />
                                                         </div>
-                                                        <div className="space-y-1.5">
+                                                        <div className="space-y-1.5 col-span-2 md:col-span-1">
                                                             <label className="text-[8px] font-black text-green-500 uppercase tracking-widest px-1">Commission</label>
                                                             <div className="relative">
                                                                 <input
@@ -626,7 +627,7 @@ export default function BarbersPage() {
                                                                     disabled={!state.enabled}
                                                                     value={state.commission_fixed}
                                                                     onChange={e => handleUpdateMappingField(service.id, "commission_fixed", e.target.value)}
-                                                                    className="w-32 bg-green-50 disabled:bg-gray-100/50 border-transparent focus:bg-white focus:ring-4 focus:ring-green-100 rounded-2xl px-5 py-3 text-sm font-black outline-none transition-all text-green-700 font-black"
+                                                                    className="w-full lg:w-32 bg-green-50 disabled:bg-gray-100/50 border-transparent focus:bg-white focus:ring-4 focus:ring-green-100 rounded-2xl px-5 py-3 text-sm font-black outline-none transition-all text-green-700 h-[48px]"
                                                                 />
                                                             </div>
                                                         </div>
@@ -639,12 +640,12 @@ export default function BarbersPage() {
                             )}
                         </div>
 
-                        <div className="p-10 bg-white border-t border-gray-100 flex gap-4">
+                        <div className="p-6 md:p-10 bg-white border-t border-gray-100 flex flex-col md:flex-row gap-4">
                             {editingBarber && (
                                 <button
                                     type="button"
                                     onClick={() => handleDelete(editingBarber.id)}
-                                    className="px-10 py-5 rounded-3xl text-[10px] font-black text-red-400 uppercase tracking-widest hover:bg-red-50 transition-all"
+                                    className="w-full md:w-auto px-10 py-5 rounded-3xl text-[10px] font-black text-red-400 uppercase tracking-widest hover:bg-red-50 transition-all text-center h-[56px] flex items-center justify-center"
                                 >
                                     Resign Barber
                                 </button>
@@ -652,7 +653,7 @@ export default function BarbersPage() {
                             <button
                                 disabled={isSaving}
                                 type="submit"
-                                className="flex-1 bg-black text-white py-6 rounded-[32px] font-black text-[11px] uppercase tracking-[0.4em] flex items-center justify-center gap-4 hover:bg-gray-800 transition-all active:scale-95 disabled:opacity-50 shadow-2xl shadow-black/20"
+                                className="flex-1 bg-black text-white py-5 md:py-6 rounded-[24px] md:rounded-[32px] font-black text-[11px] uppercase tracking-[0.4em] flex items-center justify-center gap-4 hover:bg-gray-800 transition-all active:scale-95 disabled:opacity-50 shadow-2xl shadow-black/20 h-[56px] md:h-auto"
                             >
                                 {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
                                 {editingBarber ? "Synchronize & Update HQ" : "Welcome to the Crew"}

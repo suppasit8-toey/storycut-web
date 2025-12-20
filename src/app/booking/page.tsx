@@ -1,15 +1,27 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronRight, Check, Loader2, Upload } from "lucide-react";
+import { ChevronRight, Check, Loader2, Upload, Calendar as CalendarIcon, Clock } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { collection, query, where, getDocs, addDoc, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
+
+// --- Helpers ---
+// Use this for ALL date storage and querying
+const formatDate = (date: Date): string => {
+    const d = new Date(date);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+};
 
 // --- Types ---
 type Service = {
@@ -17,13 +29,14 @@ type Service = {
     name: string;
     description: string;
     price: number;
+    duration?: number; // Duration in hours, default 1
 };
 
 type Barber = {
     id: string;
     name: string;
     role: string;
-    initial: string;
+    nickname: string;
 };
 
 interface BookingState {
@@ -37,22 +50,13 @@ interface BookingState {
     };
 }
 
-// --- Mock Data ---
-const SERVICES: Service[] = [
-    { id: "1", name: "ตัดผม", description: "ตัดผม ออกแบบทรงผม", price: 400 },
-    { id: "2", name: "ตัดผม + โกนหนวด", description: "ตัดผม ตกแต่งหนวดเครา", price: 500 },
-    { id: "3", name: "ดัดวอลลุ่ม", description: "เพิ่มวอลลุ่มให้เส้นผม", price: 1500 },
-];
+type SlotStatus = 'available' | 'full' | 'selected';
 
-const BARBERS: Barber[] = [
-    { id: "1", name: "ช่างต้น", role: "Master Barber", initial: "T" },
-    { id: "2", name: "ช่างเจ", role: "Senior Barber", initial: "J" },
-    { id: "3", name: "ช่างเอก", role: "Barber", initial: "A" },
-];
-
+// --- Constants ---
 const TIME_SLOTS = [
     "10:00", "11:00", "12:00", "13:00",
-    "14:00", "15:00", "16:00", "17:00", "18:00"
+    "14:00", "15:00", "16:00", "17:00",
+    "18:00", "19:00", "20:00", "21:00"
 ];
 
 // Generate next 14 days
@@ -75,6 +79,14 @@ const formatPrice = (price: number) => `฿ ${price.toLocaleString()}`;
 export default function BookingPage() {
     const router = useRouter();
     const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Data State
+    const [services, setServices] = useState<Service[]>([]);
+    const [barbers, setBarbers] = useState<Barber[]>([]);
+    const [unavailableSlots, setUnavailableSlots] = useState<Set<string>>(new Set());
+
+    // Booking State
     const [booking, setBooking] = useState<BookingState>({
         service: null,
         barber: null,
@@ -85,20 +97,168 @@ export default function BookingPage() {
 
     const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'success'>('idle');
 
+    // --- Data Fetching ---
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                // Fetch Services
+                const servicesSnap = await getDocs(collection(db, "services"));
+                const servicesData = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
+                setServices(servicesData);
+
+                // Fetch Barbers
+                const barbersSnap = await getDocs(collection(db, "barbers"));
+                const barbersData = barbersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Barber));
+                setBarbers(barbersData);
+            } catch (error) {
+                console.error("Error fetching initial data:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+    // --- Availability Logic ---
+    useEffect(() => {
+        if (!booking.date || !booking.barber || step !== 3) return;
+
+        setIsLoading(true);
+        const dateStr = formatDate(booking.date);
+        const barberId = booking.barber.id;
+
+        // Listen to Bookings
+        const qBookings = query(
+            collection(db, "bookings"),
+            where("date", "==", dateStr),
+            where("barberId", "==", barberId),
+            where("status", "in", ["confirmed", "pending", "in_progress", "done"]) // Assuming these block slots
+        );
+
+        // Listen to Leave Requests
+        const qLeaves = query(
+            collection(db, "leave_requests"),
+            where("date", "==", dateStr),
+            where("barberId", "==", barberId),
+            where("status", "in", ["approved", "pending"])
+        );
+
+        // Fetch both concurrently
+        const checkAvailability = async () => {
+            const [bookingsSnap, leavesSnap] = await Promise.all([
+                getDocs(qBookings),
+                getDocs(qLeaves)
+            ]);
+
+            const blocked = new Set<string>();
+
+            // Process Bookings
+            bookingsSnap.forEach(doc => {
+                const data = doc.data();
+                const startSlot = data.time;
+                const duration = data.duration || 1; // Default 1 hour if not specified
+
+                // Block start slot
+                blocked.add(startSlot);
+
+                // Block subsequent slots based on duration
+                // Logic: Find index of startSlot, block next (duration - 1) slots
+                const startIndex = TIME_SLOTS.indexOf(startSlot);
+                if (startIndex !== -1) {
+                    for (let i = 1; i < duration; i++) {
+                        if (startIndex + i < TIME_SLOTS.length) {
+                            blocked.add(TIME_SLOTS[startIndex + i]);
+                        }
+                    }
+                }
+            });
+
+            // Process Leaves
+            leavesSnap.forEach(doc => {
+                const data = doc.data();
+                const startSlot = data.startTime; // Assuming leave request has startTime
+                const endSlot = data.endTime;     // Assuming leave request has endTime
+
+                // Simple range blocking
+                if (startSlot && endSlot) {
+                    let startIndex = TIME_SLOTS.indexOf(startSlot);
+                    let endIndex = TIME_SLOTS.indexOf(endSlot);
+
+                    if (startIndex !== -1 && endIndex !== -1) {
+                        // Block all slots from start to end (inclusive of start, exclusive of end typically, 
+                        // but for simplicty let's assume leaves block specific hours)
+                        // Let's assume inclusive for now or until next slot.
+                        // Better Logic: Iterate all slots and check if they fall within leave window
+                        // For simplicity in this specialized prompt: 
+                        // If leave says 12:00 to 14:00, it blocks 12:00 and 13:00.
+                        for (let i = startIndex; i < endIndex; i++) {
+                            blocked.add(TIME_SLOTS[i]);
+                        }
+                    }
+                } else if (data.time) {
+                    // Single slot leave
+                    blocked.add(data.time);
+                    // If duration exists for leave
+                    const duration = data.duration || 1;
+                    const startIndex = TIME_SLOTS.indexOf(data.time);
+                    if (startIndex !== -1) {
+                        for (let i = 1; i < duration; i++) {
+                            if (startIndex + i < TIME_SLOTS.length) {
+                                blocked.add(TIME_SLOTS[startIndex + i]);
+                            }
+                        }
+                    }
+                }
+            });
+
+            setUnavailableSlots(blocked);
+            setIsLoading(false);
+        };
+
+        checkAvailability();
+
+    }, [booking.date, booking.barber, step]);
+
+
+    // --- Handlers ---
     const handleNext = () => {
         if (step < 4) setStep((s) => (s + 1) as any);
     };
 
     const handleConfirm = async () => {
-        setSubmitStatus('loading');
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        setSubmitStatus('success');
+        if (!booking.service || !booking.barber || !booking.date || !booking.time) return;
 
-        // Redirect after success
-        setTimeout(() => {
-            router.push('/booking/status');
-        }, 2000);
+        setSubmitStatus('loading');
+
+        try {
+            const bookingData = {
+                serviceId: booking.service.id,
+                serviceName: booking.service.name,
+                price: booking.service.price,
+                barberId: booking.barber.id,
+                barberName: booking.barber.name,
+                date: formatDate(booking.date), // CRITICAL: DD/MM/YYYY
+                time: booking.time,
+                customerName: booking.customer.name,
+                customerPhone: booking.customer.phone,
+                status: 'pending',
+                duration: booking.service.duration || 1, // Store duration for future blocking logic
+                createdAt: new Date().toISOString()
+            };
+
+            await addDoc(collection(db, "bookings"), bookingData);
+
+            setSubmitStatus('success');
+
+            // Redirect after success
+            setTimeout(() => {
+                router.push('/booking/status');
+            }, 2000);
+        } catch (error) {
+            console.error("Error creating booking:", error);
+            setSubmitStatus('idle'); // Should show error
+            alert("เกิดข้อผิดพลาดในการจอง กรุณาลองใหม่อีกครั้ง");
+        }
     };
 
     // --- Computed ---
@@ -111,7 +271,6 @@ export default function BookingPage() {
     };
 
     const dayOfWeek = (date: Date) => {
-        // Basic implementation since toLocaleDateString might vary by env
         const days = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
         return days[date.getDay()];
     };
@@ -125,7 +284,7 @@ export default function BookingPage() {
         return `${date.getDate()} ${date.toLocaleDateString('th-TH', { month: 'short' })} ${date.getFullYear() + 543}`;
     };
 
-    // --- Components ---
+    // --- UI Components ---
 
     const Header = () => (
         <div className="flex justify-between items-center px-6 py-4 border-b border-gray-50 flex-none bg-white z-20">
@@ -167,12 +326,11 @@ export default function BookingPage() {
         <div className="p-6 space-y-4 animate-in fade-in slide-in-from-right-8 duration-500">
             <h2 className="text-2xl font-bold mb-6">เลือกบริการ</h2>
             <div className="flex flex-col gap-3">
-                {SERVICES.map((service) => (
+                {services.map((service) => (
                     <div
                         key={service.id}
                         onClick={() => {
                             setBooking(b => ({ ...b, service }));
-                            // Auto advance for better UX on mobile
                             setTimeout(() => setStep(2), 150);
                         }}
                         className={cn(
@@ -192,6 +350,9 @@ export default function BookingPage() {
                         </div>
                     </div>
                 ))}
+                {services.length === 0 && !isLoading && (
+                    <div className="text-center text-gray-400 py-10">ไม่พบข้อมูลบริการ</div>
+                )}
             </div>
         </div>
     );
@@ -201,7 +362,7 @@ export default function BookingPage() {
         <div className="p-6 space-y-4 animate-in fade-in slide-in-from-right-8 duration-500">
             <h2 className="text-2xl font-bold mb-6">เลือกช่าง</h2>
             <div className="grid grid-cols-1 gap-3">
-                {BARBERS.map((barber) => (
+                {barbers.map((barber) => (
                     <div
                         key={barber.id}
                         onClick={() => {
@@ -217,17 +378,19 @@ export default function BookingPage() {
                     >
                         <div className="flex items-center gap-4">
                             <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center text-xl font-bold text-gray-400 relative overflow-hidden">
-                                {/* In real app, would be an Image */}
-                                {barber.initial}
+                                {barber.nickname?.charAt(0) || barber.name.charAt(0)}
                             </div>
                             <div>
-                                <div className="font-bold text-lg mb-0.5">{barber.name}</div>
+                                <div className="font-bold text-lg mb-0.5">{barber.nickname || barber.name}</div>
                                 <div className="text-gray-400 text-sm">{barber.role}</div>
                             </div>
                         </div>
                         {booking.barber?.id === barber.id && <Check className="w-5 h-5 text-black" />}
                     </div>
                 ))}
+                {barbers.length === 0 && !isLoading && (
+                    <div className="text-center text-gray-400 py-10">ไม่พบข้อมูลช่าง</div>
+                )}
             </div>
         </div>
     );
@@ -239,31 +402,27 @@ export default function BookingPage() {
 
             {/* Date Picker */}
             <div>
-
                 <div className="flex gap-3 overflow-x-auto pb-4 -mx-6 px-6 hide-scrollbar snap-x">
                     {AVAILABLE_DATES.map((date, idx) => {
                         const isSelected = booking.date?.toDateString() === date.toDateString();
-                        const isFull = idx === 2; // Mock full state
-
                         return (
                             <div
                                 key={idx}
-                                onClick={() => !isFull && setBooking(b => ({ ...b, date }))}
+                                onClick={() => {
+                                    setBooking(b => ({ ...b, date, time: null })); // Reset time on date change
+                                    setUnavailableSlots(new Set()); // Reset avail until fetched
+                                }}
                                 className={cn(
                                     "flex flex-col items-center justify-center min-w-[70px] h-[90px] rounded-2xl border transition-all cursor-pointer snap-start flex-none",
                                     isSelected
                                         ? "bg-black text-white border-black shadow-lg shadow-black/20"
-                                        : "bg-white border-gray-100 text-gray-400 hover:border-gray-300",
-                                    isFull && "opacity-50 cursor-not-allowed bg-gray-50"
+                                        : "bg-white border-gray-100 text-gray-400 hover:border-gray-300"
                                 )}
                             >
                                 <div className="text-xs font-medium mb-1">{dayOfWeek(date)}</div>
                                 <div className={cn("text-2xl font-bold mb-2", isSelected ? "text-white" : "text-black")}>{dayNumber(date)}</div>
 
-                                {/* Dot indicator */}
-                                <div className={cn("w-1.5 h-1.5 rounded-full",
-                                    isFull ? "bg-red-500" : (isSelected ? "bg-white" : "bg-green-500")
-                                )} />
+                                {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                             </div>
                         );
                     })}
@@ -271,28 +430,47 @@ export default function BookingPage() {
             </div>
 
             {/* Time Picker */}
-            <div>
-                <div className="text-sm font-bold text-gray-900 mb-4">เวลาที่ว่าง</div>
-                <div className="grid grid-cols-3 gap-3">
-                    {TIME_SLOTS.map((time) => {
-                        const isSelected = booking.time === time;
-                        return (
-                            <button
-                                key={time}
-                                onClick={() => setBooking(b => ({ ...b, time }))}
-                                className={cn(
-                                    "py-3 rounded-xl text-sm font-semibold border transition-all",
-                                    isSelected
-                                        ? "bg-black text-white border-black shadow-md"
-                                        : "bg-white text-black border-gray-100 hover:border-black"
-                                )}
-                            >
-                                {time}
-                            </button>
-                        )
-                    })}
+            {booking.date && (
+                <div>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="text-sm font-bold text-gray-900">เวลาที่ว่าง</div>
+                        {isLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                        {TIME_SLOTS.map((time) => {
+                            const isSelected = booking.time === time;
+                            const isUnavailable = unavailableSlots.has(time);
+
+                            return (
+                                <button
+                                    key={time}
+                                    disabled={isUnavailable}
+                                    onClick={() => setBooking(b => ({ ...b, time }))}
+                                    className={cn(
+                                        "py-3 rounded-xl text-sm font-semibold border transition-all relative overflow-hidden",
+                                        isSelected
+                                            ? "bg-black text-white border-black shadow-md z-10"
+                                            : "bg-white text-black border-gray-100 hover:border-black",
+                                        isUnavailable && "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed hover:border-gray-100"
+                                    )}
+                                >
+                                    {time}
+                                    {isUnavailable && (
+                                        <span className="absolute inset-0 flex items-center justify-center bg-gray-50/80 text-[10px] font-bold text-red-500 uppercase tracking-wider">
+                                            เต็ม (FULL)
+                                        </span>
+                                    )}
+                                </button>
+                            )
+                        })}
+                    </div>
+                    {/* Helper text for duration */}
+                    <div className="mt-4 text-xs text-gray-400 text-center">
+                        * บริการใช้เวลาประมาณ {booking.service?.duration || 1} ชั่วโมง
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 
@@ -333,7 +511,7 @@ export default function BookingPage() {
                 </div>
                 <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-900 font-medium">ช่าง</span>
-                    <span className="font-bold">{booking.barber?.name}</span>
+                    <span className="font-bold">{booking.barber?.nickname || booking.barber?.name}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-900 font-medium">วันเวลา</span>
@@ -348,7 +526,6 @@ export default function BookingPage() {
 
             {/* Payment Blue Box */}
             <div className="bg-blue-600 rounded-2xl p-5 text-white shadow-lg shadow-blue-200 relative overflow-hidden">
-                {/* Pattern overlay */}
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10" />
 
                 <div className="relative z-10">
@@ -367,15 +544,18 @@ export default function BookingPage() {
 
                     <button className="w-full bg-white/10 hover:bg-white/20 transition-colors border-2 border-dashed border-white/30 rounded-xl py-3 flex items-center justify-center gap-2 text-sm font-medium">
                         <Upload className="w-4 h-4" />
-                        แนบสลิปโอนเงิน
+                        แนบสลิปโอนเงิน (จำลอง)
                     </button>
+                    <div className="text-[10px] text-blue-200 mt-2 text-center opacity-70">
+                        * ในเวอร์ชั่น Demo นี้ ไม่จำเป็นต้องแนบสลิปจริง
+                    </div>
                 </div>
             </div>
         </div>
     );
 
     const SuccessModal = () => (
-        <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="bg-white w-full max-w-[320px] rounded-3xl p-8 flex flex-col items-center text-center shadow-2xl animate-in zoom-in-95 duration-300">
                 <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6 text-green-600">
                     <Check className="w-10 h-10" strokeWidth={3} />
@@ -390,7 +570,7 @@ export default function BookingPage() {
 
     // --- Main Render ---
     return (
-        <>
+        <div className="min-h-screen bg-white flex flex-col font-sans">
             <Header />
             <ProgressBar />
 
@@ -409,7 +589,6 @@ export default function BookingPage() {
                         <div className="text-xs font-semibold text-gray-500">
                             {booking.service?.name} {booking.service?.price && `• ${formatPrice(booking.service.price)}`}
                         </div>
-                        {/* Optional total if needed */}
                     </div>
                 )}
 
@@ -430,7 +609,7 @@ export default function BookingPage() {
                         </>
                     ) : (
                         <>
-                            {step === 4 ? "ยืนยันการจอง" : "ยืนยันบริการ"}
+                            {step === 4 ? "ยืนยันการจอง" : "ถัดไป"}
                             {step < 4 && <ChevronRight className="w-4 h-4" />}
                         </>
                     )}
@@ -439,6 +618,6 @@ export default function BookingPage() {
 
             {submitStatus === 'success' && <SuccessModal />}
 
-        </>
+        </div>
     );
 }

@@ -125,26 +125,26 @@ export default function ServicesPage() {
     );
 
     return (
-        <div className="p-8 max-w-7xl mx-auto">
-            <header className="mb-10 flex justify-between items-end">
+        <div className="p-4 md:p-8 max-w-7xl mx-auto">
+            <header className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
                 <div>
                     <h1 className="text-3xl font-black text-gray-900 mb-2">Service Management</h1>
-                    <p className="text-gray-500 font-medium">จัดการรายการบริการและตั้งค่าราคามาตรฐาน</p>
+                    <p className="text-sm text-gray-500 font-medium">จัดการรายการบริการและตั้งค่าราคามาตรฐาน</p>
                 </div>
-                <div className="flex gap-4">
-                    <div className="relative">
+                <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+                    <div className="relative flex-1 sm:w-64">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <input
                             type="text"
                             placeholder="ค้นหาบริการ..."
-                            className="pl-12 pr-6 py-3 bg-white border border-gray-200 rounded-2xl w-64 shadow-sm focus:ring-2 focus:ring-black/5 outline-none transition-all"
+                            className="pl-12 pr-6 py-3 bg-white border border-gray-200 rounded-2xl w-full shadow-sm focus:ring-2 focus:ring-black/5 outline-none transition-all text-sm"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                     </div>
                     <button
                         onClick={() => handleOpenModal()}
-                        className="bg-black text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-gray-800 transition-all active:scale-95 shadow-lg shadow-black/10"
+                        className="bg-black text-white px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-gray-800 transition-all active:scale-95 shadow-lg shadow-black/10 h-[52px]"
                     >
                         <Plus className="w-4 h-4" /> Add Service
                     </button>
@@ -157,7 +157,7 @@ export default function ServicesPage() {
                     <p className="font-bold text-gray-300 uppercase tracking-widest text-xs">Loading Services...</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredServices.map((service) => (
                         <div key={service.id} className="bg-white rounded-[32px] border border-gray-100 p-8 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden">
                             <div className="absolute top-0 left-0 w-2 h-full bg-black" />
@@ -207,11 +207,11 @@ export default function ServicesPage() {
 
             {/* Add/Edit Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
+                <div className="fixed inset-0 z-[70] flex items-end md:items-center justify-center md:p-6">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
                     <form
                         onSubmit={handleSave}
-                        className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300"
+                        className="relative w-full md:max-w-lg bg-white rounded-t-[40px] md:rounded-[40px] shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full md:zoom-in-95 duration-300 max-h-[90vh] flex flex-col"
                     >
                         <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                             <h2 className="text-xl font-black italic">{editingService ? "Edit Service" : "Add New Service"}</h2>
@@ -220,8 +220,8 @@ export default function ServicesPage() {
                             </button>
                         </div>
 
-                        <div className="p-8 space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
+                        <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">ชื่อภาษาไทย</label>
                                     <input
@@ -229,7 +229,7 @@ export default function ServicesPage() {
                                         type="text"
                                         value={formData.name_th}
                                         onChange={e => setFormData({ ...formData, name_th: e.target.value })}
-                                        className="w-full bg-gray-50 border-transparent focus:bg-white focus:ring-2 focus:ring-black/5 rounded-2xl px-5 py-3 text-sm font-bold outline-none transition-all"
+                                        className="w-full bg-gray-50 border-transparent focus:bg-white focus:ring-2 focus:ring-black/5 rounded-2xl px-5 py-4 text-sm font-bold outline-none transition-all"
                                         placeholder="เช่น ตัดผมชาย"
                                     />
                                 </div>
@@ -240,7 +240,7 @@ export default function ServicesPage() {
                                         type="text"
                                         value={formData.name_en}
                                         onChange={e => setFormData({ ...formData, name_en: e.target.value })}
-                                        className="w-full bg-gray-50 border-transparent focus:bg-white focus:ring-2 focus:ring-black/5 rounded-2xl px-5 py-3 text-sm font-bold outline-none transition-all uppercase"
+                                        className="w-full bg-gray-50 border-transparent focus:bg-white focus:ring-2 focus:ring-black/5 rounded-2xl px-5 py-4 text-sm font-bold outline-none transition-all uppercase"
                                         placeholder="HAIRCUT"
                                     />
                                 </div>
@@ -255,7 +255,7 @@ export default function ServicesPage() {
                                             type="button"
                                             onClick={() => setFormData({ ...formData, duration_min: mins })}
                                             className={cn(
-                                                "py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border",
+                                                "py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border",
                                                 formData.duration_min === mins
                                                     ? "bg-black text-white border-black shadow-lg shadow-black/10"
                                                     : "bg-white text-gray-400 border-gray-100 hover:bg-gray-50"
@@ -267,7 +267,7 @@ export default function ServicesPage() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Base Price (฿)</label>
                                     <input
@@ -275,7 +275,7 @@ export default function ServicesPage() {
                                         type="number"
                                         value={formData.base_price}
                                         onChange={e => setFormData({ ...formData, base_price: Number(e.target.value) })}
-                                        className="w-full bg-gray-50 border-transparent focus:bg-white focus:ring-2 focus:ring-black/5 rounded-2xl px-5 py-3 text-sm font-bold outline-none transition-all"
+                                        className="w-full bg-gray-50 border-transparent focus:bg-white focus:ring-2 focus:ring-black/5 rounded-2xl px-5 py-4 text-sm font-bold outline-none transition-all"
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -284,7 +284,7 @@ export default function ServicesPage() {
                                         type="number"
                                         value={formData.price_promo}
                                         onChange={e => setFormData({ ...formData, price_promo: e.target.value })}
-                                        className="w-full bg-red-50/50 border-transparent focus:bg-white focus:ring-2 focus:ring-red-500/10 rounded-2xl px-5 py-3 text-sm font-bold text-red-700 outline-none transition-all placeholder:text-red-200"
+                                        className="w-full bg-red-50/50 border-transparent focus:bg-white focus:ring-2 focus:ring-red-500/10 rounded-2xl px-5 py-4 text-sm font-bold text-red-700 outline-none transition-all placeholder:text-red-200"
                                         placeholder="None"
                                     />
                                 </div>
@@ -297,7 +297,7 @@ export default function ServicesPage() {
                                     type="number"
                                     value={formData.deposit_amount}
                                     onChange={e => setFormData({ ...formData, deposit_amount: Number(e.target.value) })}
-                                    className="w-full bg-green-50/50 border-transparent focus:bg-white focus:ring-2 focus:ring-green-500/10 rounded-2xl px-5 py-3 text-sm font-bold text-green-700 outline-none transition-all"
+                                    className="w-full bg-green-50/50 border-transparent focus:bg-white focus:ring-2 focus:ring-green-500/10 rounded-2xl px-5 py-4 text-sm font-bold text-green-700 outline-none transition-all"
                                 />
                             </div>
                         </div>
@@ -306,7 +306,7 @@ export default function ServicesPage() {
                             <button
                                 disabled={isSaving}
                                 type="submit"
-                                className="w-full bg-black text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2 hover:bg-gray-800 transition-all active:scale-95 disabled:opacity-50"
+                                className="w-full bg-black text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2 hover:bg-gray-800 transition-all active:scale-95 disabled:opacity-50 h-[56px]"
                             >
                                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                                 {editingService ? "Update Service" : "Create Service"}
