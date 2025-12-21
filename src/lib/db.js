@@ -209,6 +209,8 @@ export const updateBarberService = async (barberId, serviceId, data) => {
                 price_normal: Number(data.price_normal),
                 price_promo: data.price_promo ? Number(data.price_promo) : null,
                 commission_fixed: Number(data.commission_fixed || 0),
+                promotion_text: data.promotion_text || "",
+                promotion_active: Boolean(data.promotion_active),
                 updatedAt: new Date()
             });
         } else {

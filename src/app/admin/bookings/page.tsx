@@ -207,29 +207,32 @@ export default function AdminBookingsPage() {
     const renderListView = () => (
         <div className="space-y-4">
             {filteredBookings.length === 0 ? (
-                <div className="text-center py-20 bg-[#1A1A1A] rounded-[32px] text-gray-500 font-bold">No bookings found</div>
+                <div className="text-center py-20 bg-[#1A1A1A] rounded-[32px] text-gray-500 font-bold opacity-50 uppercase tracking-widest">No bookings found</div>
             ) : filteredBookings.map(booking => (
-                <div key={booking.id} className="bg-[#1A1A1A] p-6 rounded-[24px] border border-white/5 flex items-center justify-between hover:border-white/20 transition-all cursor-pointer"
+                <div key={booking.id} className="bg-[#1A1A1A] p-6 rounded-[24px] border border-white/5 flex items-center justify-between hover:border-white/20 transition-all cursor-pointer group"
                     onClick={() => { setSelectedBooking(booking); setShowModal(true); }}>
-                    <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-8">
                         <div className="w-16 text-center">
-                            <div className="text-sm font-black text-gray-500 uppercase">{booking.time}</div>
-                            <div className="text-xs font-bold text-white/20">{booking.date}</div>
+                            <div className="text-lg font-black text-white font-inter">{booking.time}</div>
+                            <div className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">{booking.date}</div>
                         </div>
                         <div>
-                            <h4 className="font-bold text-lg text-white mb-1">{booking.serviceName}</h4>
-                            <div className="flex items-center gap-4 text-xs font-medium text-gray-400">
-                                <span className="flex items-center gap-1"><User className="w-3 h-3" /> {booking.customerName}</span>
-                                <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {booking.customerPhone || booking.phone || "-"}</span>
-                                <span className="flex items-center gap-1"><Scissors className="w-3 h-3" /> {booking.barberName}</span>
+                            <h4 className="font-bold text-xl text-white mb-2 font-inter tracking-tight uppercase">{booking.serviceName}</h4>
+                            <div className="flex flex-col gap-1">
+                                <span className="text-sm font-bold text-gray-300">{booking.customerName}</span>
+                                <span className="text-xs font-medium text-gray-600 tracking-wide uppercase">
+                                    {booking.barberName} • {booking.customerPhone || booking.phone || "No Phone"}
+                                </span>
                             </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <div className={cn("px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest", getStatusColor(booking.status).replace('bg-', 'text-').replace('text-white', ''))}>
+                    <div className="flex items-center gap-6">
+                        <div className={cn("px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/5", getStatusColor(booking.status).replace('bg-', 'text-').replace('text-white', ''))}>
                             {booking.status}
                         </div>
-                        <ChevronRight className="w-5 h-5 text-gray-600" />
+                        <div className="w-10 h-10 rounded-full border border-white/5 flex items-center justify-center text-gray-600 group-hover:bg-white group-hover:text-black transition-all">
+                            <ChevronRight className="w-4 h-4" />
+                        </div>
                     </div>
                 </div>
             ))}

@@ -7,15 +7,10 @@ import { addService, updateService, deleteService } from "@/lib/db";
 import {
     Plus,
     Search,
-    Settings,
     Edit3,
     Trash2,
-    Clock,
-    DollarSign,
-    CheckCircle2,
     X,
-    Loader2,
-    AlertTriangle
+    Loader2
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -125,196 +120,194 @@ export default function ServicesPage() {
     );
 
     return (
-        <div className="p-4 md:p-8 max-w-7xl mx-auto">
-            <header className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-                <div>
-                    <h1 className="text-3xl font-black text-gray-900 mb-2">Service Management</h1>
-                    <p className="text-sm text-gray-500 font-medium">จัดการรายการบริการและตั้งค่าราคามาตรฐาน</p>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-                    <div className="relative flex-1 sm:w-64">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="ค้นหาบริการ..."
-                            className="pl-12 pr-6 py-3 bg-white border border-gray-200 rounded-2xl w-full shadow-sm focus:ring-2 focus:ring-black/5 outline-none transition-all text-sm"
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                        />
+        <div className="min-h-screen bg-black text-white p-6 md:p-10 pb-20 font-sans">
+            <div className="max-w-[1600px] mx-auto">
+                <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10">
+                    <div>
+                        <h1 className="text-4xl font-black italic tracking-tighter text-white mb-2 font-inter uppercase">Services</h1>
+                        <p className="text-gray-400 text-xs font-bold uppercase tracking-[0.2em]">SERVICE MENU</p>
                     </div>
-                    <button
-                        onClick={() => handleOpenModal()}
-                        className="bg-black text-white px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-gray-800 transition-all active:scale-95 shadow-lg shadow-black/10 h-[52px]"
-                    >
-                        <Plus className="w-4 h-4" /> Add Service
-                    </button>
-                </div>
-            </header>
+                    <div className="flex gap-4 w-full md:w-auto">
+                        <div className="relative flex-1 md:w-64">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                            <input
+                                type="text"
+                                placeholder="Search services..."
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                className="w-full bg-[#1A1A1A] border border-gray-800 rounded-full pl-10 pr-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-white transition-colors"
+                            />
+                        </div>
+                        <button
+                            onClick={() => handleOpenModal()}
+                            className="bg-white text-black px-6 py-3 rounded-full font-bold text-sm hover:bg-gray-200 transition-colors flex items-center gap-2 whitespace-nowrap"
+                        >
+                            <Plus className="w-4 h-4" /> Add Service
+                        </button>
+                    </div>
+                </header>
 
-            {loading ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-4">
-                    <Loader2 className="w-10 h-10 text-black animate-spin" />
-                    <p className="font-bold text-gray-300 uppercase tracking-widest text-xs">Loading Services...</p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredServices.map((service) => (
-                        <div key={service.id} className="bg-white rounded-[32px] border border-gray-100 p-8 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-2 h-full bg-black" />
-
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    <h3 className="text-xl font-black text-gray-900 mb-1">{service.name_th}</h3>
-                                    <p className="text-sm font-bold text-gray-400 italic lowercase">{service.name_en}</p>
-                                </div>
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => handleOpenModal(service)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-                                        <Edit3 className="w-4 h-4 text-gray-600" />
-                                    </button>
-                                    <button onClick={() => handleDelete(service.id)} className="p-2 hover:bg-red-50 rounded-xl transition-colors text-red-400">
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-3 text-gray-600">
-                                    <Clock className="w-4 h-4 text-gray-400" />
-                                    <span className="text-sm font-bold">{service.duration_min} Minutes</span>
-                                </div>
-                                <div className="flex items-center gap-3 text-gray-600">
-                                    <DollarSign className="w-4 h-4 text-gray-400" />
-                                    <div className="flex flex-col">
-                                        <span className={cn("text-sm font-bold", service.price_promo && "line-through text-gray-400 text-xs")}>
-                                            Base: ฿{service.base_price.toLocaleString()}
-                                        </span>
-                                        {service.price_promo && (
-                                            <span className="text-sm font-black text-red-500">
-                                                Promo: ฿{service.price_promo.toLocaleString()}
-                                            </span>
-                                        )}
+                {loading ? (
+                    <div className="flex justify-center py-20">
+                        <Loader2 className="w-8 h-8 animate-spin text-white" />
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                        {filteredServices.map((service) => (
+                            <div key={service.id} className="bg-[#1A1A1A] rounded-[32px] p-8 flex flex-col md:flex-row items-center justify-between border border-transparent hover:border-gray-800 transition-colors group">
+                                <div className="flex flex-col gap-1 w-full md:w-auto text-center md:text-left mb-4 md:mb-0">
+                                    <h3 className="text-2xl font-bold text-white uppercase tracking-tight">{service.name_th}</h3>
+                                    <div className="flex items-center justify-center md:justify-start gap-2 text-sm text-gray-400 font-medium">
+                                        <span className="uppercase tracking-wider">{service.name_en}</span>
+                                        <span className="text-gray-600">•</span>
+                                        <span>{service.duration_min} MIN</span>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3 text-green-600 bg-green-50/50 p-3 rounded-2xl border border-green-100/50">
-                                    <CheckCircle2 className="w-4 h-4" />
-                                    <span className="text-xs font-black uppercase tracking-widest">Deposit: ฿{service.deposit_amount.toLocaleString()}</span>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
 
-            {/* Add/Edit Modal */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-[70] flex items-end md:items-center justify-center md:p-6">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
-                    <form
-                        onSubmit={handleSave}
-                        className="relative w-full md:max-w-lg bg-white rounded-t-[40px] md:rounded-[40px] shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full md:zoom-in-95 duration-300 max-h-[90vh] flex flex-col"
-                    >
-                        <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                            <h2 className="text-xl font-black italic">{editingService ? "Edit Service" : "Add New Service"}</h2>
-                            <button type="button" onClick={() => setIsModalOpen(false)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
+                                <div className="flex items-center gap-8 w-full md:w-auto justify-between md:justify-end">
+                                    <div className="text-right flex-1 md:flex-none">
+                                        <div className="text-white font-bold text-2xl tracking-tight">฿{service.base_price.toLocaleString()}</div>
+                                        {service.price_promo && (
+                                            <div className="text-xs text-green-500 font-bold uppercase tracking-wider">Promo Active</div>
+                                        )}
+                                    </div>
 
-                        <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">ชื่อภาษาไทย</label>
-                                    <input
-                                        required
-                                        type="text"
-                                        value={formData.name_th}
-                                        onChange={e => setFormData({ ...formData, name_th: e.target.value })}
-                                        className="w-full bg-gray-50 border-transparent focus:bg-white focus:ring-2 focus:ring-black/5 rounded-2xl px-5 py-4 text-sm font-bold outline-none transition-all"
-                                        placeholder="เช่น ตัดผมชาย"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">English Name</label>
-                                    <input
-                                        required
-                                        type="text"
-                                        value={formData.name_en}
-                                        onChange={e => setFormData({ ...formData, name_en: e.target.value })}
-                                        className="w-full bg-gray-50 border-transparent focus:bg-white focus:ring-2 focus:ring-black/5 rounded-2xl px-5 py-4 text-sm font-bold outline-none transition-all uppercase"
-                                        placeholder="HAIRCUT"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Duration</label>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {[60, 120, 180].map((mins) => (
+                                    <div className="flex gap-2">
                                         <button
-                                            key={mins}
-                                            type="button"
-                                            onClick={() => setFormData({ ...formData, duration_min: mins })}
-                                            className={cn(
-                                                "py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border",
-                                                formData.duration_min === mins
-                                                    ? "bg-black text-white border-black shadow-lg shadow-black/10"
-                                                    : "bg-white text-gray-400 border-gray-100 hover:bg-gray-50"
-                                            )}
+                                            onClick={() => handleOpenModal(service)}
+                                            className="w-10 h-10 flex items-center justify-center rounded-full bg-black border border-gray-800 text-gray-400 hover:text-white hover:border-gray-600 transition-colors"
                                         >
-                                            {mins} Min
+                                            <Edit3 className="w-4 h-4" />
                                         </button>
-                                    ))}
+                                        <button
+                                            onClick={() => handleDelete(service.id)}
+                                            className="w-10 h-10 flex items-center justify-center rounded-full bg-black border border-gray-800 text-gray-400 hover:text-red-400 hover:border-red-900/50 transition-colors"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Modal */}
+                {isModalOpen && (
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-[#111] rounded-[32px] w-full max-w-lg border border-gray-800 shadow-2xl flex flex-col max-h-[90vh]">
+                            <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-[#0A0A0A] rounded-t-[32px]">
+                                <h2 className="text-xl font-bold text-white">
+                                    {editingService ? "Edit Service" : "New Service"}
+                                </h2>
+                                <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-white">
+                                    <X className="w-6 h-6" />
+                                </button>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Base Price (฿)</label>
-                                    <input
-                                        required
-                                        type="number"
-                                        value={formData.base_price}
-                                        onChange={e => setFormData({ ...formData, base_price: Number(e.target.value) })}
-                                        className="w-full bg-gray-50 border-transparent focus:bg-white focus:ring-2 focus:ring-black/5 rounded-2xl px-5 py-4 text-sm font-bold outline-none transition-all"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 text-red-400">Promo Price (฿) - Opt</label>
-                                    <input
-                                        type="number"
-                                        value={formData.price_promo}
-                                        onChange={e => setFormData({ ...formData, price_promo: e.target.value })}
-                                        className="w-full bg-red-50/50 border-transparent focus:bg-white focus:ring-2 focus:ring-red-500/10 rounded-2xl px-5 py-4 text-sm font-bold text-red-700 outline-none transition-all placeholder:text-red-200"
-                                        placeholder="None"
-                                    />
-                                </div>
-                            </div>
+                            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-gray-500 uppercase">Thai Name</label>
+                                            <input
+                                                required
+                                                type="text"
+                                                value={formData.name_th}
+                                                onChange={e => setFormData({ ...formData, name_th: e.target.value })}
+                                                className="w-full bg-[#0A0A0A] border border-gray-800 rounded-xl px-4 py-3 text-white focus:border-white outline-none font-bold"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-gray-500 uppercase">English Name</label>
+                                            <input
+                                                required
+                                                type="text"
+                                                value={formData.name_en}
+                                                onChange={e => setFormData({ ...formData, name_en: e.target.value })}
+                                                className="w-full bg-[#0A0A0A] border border-gray-800 rounded-xl px-4 py-3 text-white focus:border-white outline-none font-bold"
+                                            />
+                                        </div>
+                                    </div>
 
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 text-green-600">Deposit Amount (฿)</label>
-                                <input
-                                    required
-                                    type="number"
-                                    value={formData.deposit_amount}
-                                    onChange={e => setFormData({ ...formData, deposit_amount: Number(e.target.value) })}
-                                    className="w-full bg-green-50/50 border-transparent focus:bg-white focus:ring-2 focus:ring-green-500/10 rounded-2xl px-5 py-4 text-sm font-bold text-green-700 outline-none transition-all"
-                                />
-                            </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Duration</label>
+                                        <div className="flex gap-2">
+                                            {[60, 120, 180].map(m => (
+                                                <button
+                                                    key={m}
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, duration_min: m })}
+                                                    className={cn(
+                                                        "flex-1 py-3 rounded-xl text-sm font-bold border transition-all",
+                                                        formData.duration_min === m
+                                                            ? "bg-white text-black border-white"
+                                                            : "bg-[#0A0A0A] text-gray-500 border-gray-800 hover:border-gray-600"
+                                                    )}
+                                                >
+                                                    {m} min
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-gray-500 uppercase">Base Price</label>
+                                            <div className="relative">
+                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-mono">฿</span>
+                                                <input
+                                                    required
+                                                    type="number"
+                                                    value={formData.base_price}
+                                                    onChange={e => setFormData({ ...formData, base_price: Number(e.target.value) })}
+                                                    className="w-full bg-[#0A0A0A] border border-gray-800 rounded-xl pl-8 pr-4 py-3 text-white focus:border-white outline-none font-bold text-lg"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-gray-500 uppercase">Deposit</label>
+                                            <div className="relative">
+                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-mono">฿</span>
+                                                <input
+                                                    type="number"
+                                                    value={formData.deposit_amount}
+                                                    onChange={e => setFormData({ ...formData, deposit_amount: Number(e.target.value) })}
+                                                    className="w-full bg-[#0A0A0A] border border-gray-800 rounded-xl pl-8 pr-4 py-3 text-white focus:border-white outline-none font-bold text-lg"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Promo Price (Optional)</label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-mono">฿</span>
+                                            <input
+                                                type="number"
+                                                value={formData.price_promo}
+                                                onChange={e => setFormData({ ...formData, price_promo: e.target.value })}
+                                                className="w-full bg-[#0A0A0A] border border-gray-800 rounded-xl pl-8 pr-4 py-3 text-white focus:border-white outline-none placeholder:text-gray-700 font-bold text-lg"
+                                                placeholder="None"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-8">
+                                    <button
+                                        type="submit"
+                                        disabled={isSaving}
+                                        className="w-full bg-white text-black font-bold py-4 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50"
+                                    >
+                                        {isSaving ? "Saving..." : (editingService ? "Update Service" : "Create Service")}
+                                    </button>
+                                </div>
+                            </form>
                         </div>
-
-                        <div className="p-8 bg-gray-50/50 border-t border-gray-100">
-                            <button
-                                disabled={isSaving}
-                                type="submit"
-                                className="w-full bg-black text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2 hover:bg-gray-800 transition-all active:scale-95 disabled:opacity-50 h-[56px]"
-                            >
-                                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                                {editingService ? "Update Service" : "Create Service"}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

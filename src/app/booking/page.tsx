@@ -24,12 +24,14 @@ const formatDate = (date: Date): string => {
 };
 
 // --- Types ---
+// --- Types ---
 type Service = {
     id: string;
     name: string;
     description: string;
-    price: number;
-    duration?: number; // Duration in hours, default 1
+    price: number; // Base Price
+    price_promo?: number; // Global Promo (optional)
+    duration?: number;
 };
 
 type Barber = {
@@ -37,6 +39,15 @@ type Barber = {
     name: string;
     role: string;
     nickname: string;
+};
+
+type BarberServiceMapping = {
+    barber_id: string;
+    service_id: string;
+    price_normal: number;
+    price_promo?: number | null;
+    promotion_active?: boolean;
+    enabled: boolean;
 };
 
 interface BookingState {
@@ -48,6 +59,7 @@ interface BookingState {
         name: string;
         phone: string;
     };
+    price?: number; // Actual final price selected
 }
 
 type SlotStatus = 'available' | 'full' | 'selected';
@@ -73,9 +85,11 @@ const getNextDays = (days: number) => {
 
 const AVAILABLE_DATES = getNextDays(14);
 
-// Helper to format currency
-const formatPrice = (price: number) => `฿ ${price.toLocaleString()}`;
-
+// Helper: Format Price
+const formatPrice = (price?: number) => {
+    if (typeof price !== 'number') return "฿ 0";
+    return `฿ ${price.toLocaleString('th-TH')}`;
+};
 export default function BookingPage() {
     const router = useRouter();
     const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
@@ -84,6 +98,7 @@ export default function BookingPage() {
     // Data State
     const [services, setServices] = useState<Service[]>([]);
     const [barbers, setBarbers] = useState<Barber[]>([]);
+    const [barberServices, setBarberServices] = useState<BarberServiceMapping[]>([]); // New State for Mappings
     const [unavailableSlots, setUnavailableSlots] = useState<Set<string>>(new Set());
 
     // Booking State
@@ -99,25 +114,78 @@ export default function BookingPage() {
 
     // --- Data Fetching ---
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                // Fetch Services
-                const servicesSnap = await getDocs(collection(db, "services"));
-                const servicesData = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
-                setServices(servicesData);
+        // Use onSnapshot for Real-time updates as requested
+        const unsubServices = onSnapshot(collection(db, "services"), (snap) => {
+            setServices(snap.docs.map(d => ({ id: d.id, ...d.data() } as Service)));
+        });
 
-                // Fetch Barbers
-                const barbersSnap = await getDocs(collection(db, "barbers"));
-                const barbersData = barbersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Barber));
-                setBarbers(barbersData);
-            } catch (error) {
-                console.error("Error fetching initial data:", error);
-            } finally {
-                setIsLoading(false);
-            }
+        const unsubBarbers = onSnapshot(collection(db, "barbers"), (snap) => {
+            setBarbers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Barber)));
+        });
+
+        // Fetch Barber Services Mappings
+        const unsubMappings = onSnapshot(collection(db, "barberServices"), (snap) => {
+            setBarberServices(snap.docs.map(d => d.data() as BarberServiceMapping));
+            setIsLoading(false);
+        });
+
+        return () => {
+            unsubServices();
+            unsubBarbers();
+            unsubMappings();
         };
-        fetchData();
     }, []);
+
+    // --- Helpers for Dynamic Pricing ---
+    const getLowestPrice = (serviceId: string, basePrice: number) => {
+        // Find all enabled mappings for this service
+        const mappings = barberServices.filter(m => m.service_id === serviceId && m.enabled);
+
+        if (mappings.length === 0) return { price: basePrice, isPromo: false, originalPrice: basePrice };
+
+        let minPrice = Infinity;
+        let foundPromo = false;
+
+        mappings.forEach(m => {
+            // Determine effective price for this barber
+            // Priority: Promo (if active) > Normal > Base (fallback not needed if normal set)
+            let effectivePrice = m.price_normal;
+            if (m.promotion_active && m.price_promo) {
+                effectivePrice = m.price_promo;
+            }
+
+            if (effectivePrice < minPrice) {
+                minPrice = effectivePrice;
+            }
+        });
+
+        // Ensure we don't return Infinity if something went wrong
+        if (minPrice === Infinity) minPrice = basePrice;
+
+        return {
+            price: minPrice,
+            isPromo: minPrice < basePrice,
+            originalPrice: basePrice
+        };
+    };
+
+    // Correct price calculation when Barber is selected
+    const getFinalPrice = () => {
+        if (!booking.service) return 0;
+        if (!booking.barber) return booking.service.price;
+
+        // Find specific mapping
+        const mapping = barberServices.find(m => m.service_id === booking.service!.id && m.barber_id === booking.barber!.id);
+
+        if (mapping && mapping.enabled) {
+            if (mapping.promotion_active && mapping.price_promo) {
+                return mapping.price_promo;
+            }
+            return mapping.price_normal;
+        }
+
+        return booking.service.price; // Fallback to base
+    };
 
     // --- Availability Logic ---
     useEffect(() => {
@@ -132,7 +200,7 @@ export default function BookingPage() {
             collection(db, "bookings"),
             where("date", "==", dateStr),
             where("barberId", "==", barberId),
-            where("status", "in", ["confirmed", "pending", "in_progress", "done"]) // Assuming these block slots
+            where("status", "in", ["confirmed", "pending", "in_progress", "done"])
         );
 
         // Listen to Leave Requests
@@ -143,7 +211,6 @@ export default function BookingPage() {
             where("status", "in", ["approved", "pending"])
         );
 
-        // Fetch both concurrently
         const checkAvailability = async () => {
             const [bookingsSnap, leavesSnap] = await Promise.all([
                 getDocs(qBookings),
@@ -156,19 +223,11 @@ export default function BookingPage() {
             bookingsSnap.forEach(doc => {
                 const data = doc.data();
                 const startSlot = data.time;
-                const duration = data.duration || 1; // Default 1 hour if not specified
-
-                // Block start slot
-                blocked.add(startSlot);
-
-                // Block subsequent slots based on duration
-                // Logic: Find index of startSlot, block next (duration - 1) slots
-                const startIndex = TIME_SLOTS.indexOf(startSlot);
-                if (startIndex !== -1) {
-                    for (let i = 1; i < duration; i++) {
-                        if (startIndex + i < TIME_SLOTS.length) {
-                            blocked.add(TIME_SLOTS[startIndex + i]);
-                        }
+                const duration = data.duration || 1;
+                const bs = TIME_SLOTS.indexOf(startSlot);
+                if (bs !== -1) {
+                    for (let i = 0; i < duration; i++) {
+                        if (bs + i < TIME_SLOTS.length) blocked.add(TIME_SLOTS[bs + i]);
                     }
                 }
             });
@@ -176,37 +235,18 @@ export default function BookingPage() {
             // Process Leaves
             leavesSnap.forEach(doc => {
                 const data = doc.data();
-                const startSlot = data.startTime; // Assuming leave request has startTime
-                const endSlot = data.endTime;     // Assuming leave request has endTime
-
-                // Simple range blocking
-                if (startSlot && endSlot) {
-                    let startIndex = TIME_SLOTS.indexOf(startSlot);
-                    let endIndex = TIME_SLOTS.indexOf(endSlot);
-
-                    if (startIndex !== -1 && endIndex !== -1) {
-                        // Block all slots from start to end (inclusive of start, exclusive of end typically, 
-                        // but for simplicty let's assume leaves block specific hours)
-                        // Let's assume inclusive for now or until next slot.
-                        // Better Logic: Iterate all slots and check if they fall within leave window
-                        // For simplicity in this specialized prompt: 
-                        // If leave says 12:00 to 14:00, it blocks 12:00 and 13:00.
-                        for (let i = startIndex; i < endIndex; i++) {
-                            blocked.add(TIME_SLOTS[i]);
-                        }
+                if (data.startTime && data.endTime) {
+                    const s = TIME_SLOTS.indexOf(data.startTime);
+                    const e = TIME_SLOTS.indexOf(data.endTime);
+                    if (s !== -1 && e !== -1) {
+                        for (let i = s; i < e; i++) blocked.add(TIME_SLOTS[i]); // Assuming end is exclusive or blocks until end time
                     }
                 } else if (data.time) {
-                    // Single slot leave
                     blocked.add(data.time);
-                    // If duration exists for leave
                     const duration = data.duration || 1;
-                    const startIndex = TIME_SLOTS.indexOf(data.time);
-                    if (startIndex !== -1) {
-                        for (let i = 1; i < duration; i++) {
-                            if (startIndex + i < TIME_SLOTS.length) {
-                                blocked.add(TIME_SLOTS[startIndex + i]);
-                            }
-                        }
+                    const s = TIME_SLOTS.indexOf(data.time);
+                    if (s !== -1) {
+                        for (let i = 0; i < duration; i++) if (s + i < TIME_SLOTS.length) blocked.add(TIME_SLOTS[s + i]);
                     }
                 }
             });
@@ -230,19 +270,21 @@ export default function BookingPage() {
 
         setSubmitStatus('loading');
 
+        const finalPrice = getFinalPrice();
+
         try {
             const bookingData = {
                 serviceId: booking.service.id,
                 serviceName: booking.service.name,
-                price: booking.service.price,
+                price: finalPrice, // Use FINAL calculated price
                 barberId: booking.barber.id,
                 barberName: booking.barber.name,
-                date: formatDate(booking.date), // CRITICAL: DD/MM/YYYY
+                date: formatDate(booking.date),
                 time: booking.time,
                 customerName: booking.customer.name,
                 customerPhone: booking.customer.phone,
                 status: 'pending',
-                duration: booking.service.duration || 1, // Store duration for future blocking logic
+                duration: booking.service.duration || 1,
                 createdAt: new Date().toISOString()
             };
 
@@ -250,13 +292,12 @@ export default function BookingPage() {
 
             setSubmitStatus('success');
 
-            // Redirect after success
             setTimeout(() => {
                 router.push('/booking/status');
             }, 2000);
         } catch (error) {
             console.error("Error creating booking:", error);
-            setSubmitStatus('idle'); // Should show error
+            setSubmitStatus('idle');
             alert("เกิดข้อผิดพลาดในการจอง กรุณาลองใหม่อีกครั้ง");
         }
     };
@@ -326,30 +367,49 @@ export default function BookingPage() {
         <div className="p-6 space-y-4 animate-in fade-in slide-in-from-right-8 duration-500">
             <h2 className="text-2xl font-bold mb-6">เลือกบริการ</h2>
             <div className="flex flex-col gap-3">
-                {services.map((service) => (
-                    <div
-                        key={service.id}
-                        onClick={() => {
-                            setBooking(b => ({ ...b, service }));
-                            setTimeout(() => setStep(2), 150);
-                        }}
-                        className={cn(
-                            "group flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer active:scale-[0.98]",
-                            booking.service?.id === service.id
-                                ? "border-black bg-gray-50 ring-1 ring-black/5"
-                                : "border-gray-100 bg-white hover:border-gray-300"
-                        )}
-                    >
-                        <div>
-                            <div className="font-bold text-lg mb-1">{service.name}</div>
-                            <div className="text-gray-400 text-sm">{service.description}</div>
+                {services.map((service) => {
+                    const priceInfo = getLowestPrice(service.id, service.price);
+
+                    return (
+                        <div
+                            key={service.id}
+                            onClick={() => {
+                                setBooking(b => ({ ...b, service }));
+                                setTimeout(() => setStep(2), 150);
+                            }}
+                            className={cn(
+                                "group flex items-center justify-between p-5 rounded-2xl border transition-all cursor-pointer active:scale-[0.98]",
+                                booking.service?.id === service.id
+                                    ? "border-black bg-gray-50 ring-1 ring-black/5"
+                                    : "border-gray-100 bg-white hover:border-gray-300 shadow-sm hover:shadow-md"
+                            )}
+                        >
+                            <div>
+                                <div className="font-bold text-lg mb-1 text-gray-900">{service.name}</div>
+                                <div className="text-gray-400 text-sm font-medium">{service.description}</div>
+                            </div>
+                            <div className="flex flex-col items-end gap-0.5">
+                                {priceInfo.isPromo && (
+                                    <span className="text-xs font-bold text-gray-400 line-through decoration-gray-400/50">
+                                        {formatPrice(priceInfo.originalPrice)}
+                                    </span>
+                                )}
+                                <div className="flex items-center gap-2">
+                                    <div className="text-right">
+                                        {priceInfo.isPromo && <div className="text-[10px] font-black text-green-600 uppercase tracking-widest leading-none mb-0.5">Start From</div>}
+                                        <span className={cn(
+                                            "font-bold text-lg tracking-tight",
+                                            priceInfo.isPromo ? "text-green-600" : "text-gray-900"
+                                        )}>
+                                            {formatPrice(priceInfo.price)}
+                                        </span>
+                                    </div>
+                                    <ChevronRight className={cn("w-5 h-5 transition-colors", booking.service?.id === service.id ? "text-black" : "text-gray-300")} />
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <span className="font-bold text-lg">{formatPrice(service.price)}</span>
-                            <ChevronRight className={cn("w-5 h-5 transition-colors", booking.service?.id === service.id ? "text-black" : "text-gray-300")} />
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
                 {services.length === 0 && !isLoading && (
                     <div className="text-center text-gray-400 py-10">ไม่พบข้อมูลบริการ</div>
                 )}
@@ -362,32 +422,50 @@ export default function BookingPage() {
         <div className="p-6 space-y-4 animate-in fade-in slide-in-from-right-8 duration-500">
             <h2 className="text-2xl font-bold mb-6">เลือกช่าง</h2>
             <div className="grid grid-cols-1 gap-3">
-                {barbers.map((barber) => (
-                    <div
-                        key={barber.id}
-                        onClick={() => {
-                            setBooking(b => ({ ...b, barber }));
-                            setTimeout(() => setStep(3), 150);
-                        }}
-                        className={cn(
-                            "flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer active:scale-[0.98]",
-                            booking.barber?.id === barber.id
-                                ? "border-black bg-gray-50 ring-1 ring-black/5"
-                                : "border-gray-100 bg-white hover:border-gray-300"
-                        )}
-                    >
-                        <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center text-xl font-bold text-gray-400 relative overflow-hidden">
-                                {barber.nickname?.charAt(0) || barber.name.charAt(0)}
+                {barbers.map((barber) => {
+                    // Check if barber can perform this service
+                    // AND display specific price for this barber
+                    const mapping = barberServices.find(m => m.barber_id === barber.id && m.service_id === booking.service?.id);
+                    // If strict mode: filter out barbers who don't have mapping or mapping disabled
+                    if (!mapping || !mapping.enabled) return null;
+
+                    const effectivePrice = (mapping.promotion_active && mapping.price_promo) ? mapping.price_promo : mapping.price_normal;
+                    const isPromo = (mapping.promotion_active && !!mapping.price_promo);
+
+                    return (
+                        <div
+                            key={barber.id}
+                            onClick={() => {
+                                setBooking(b => ({ ...b, barber }));
+                                setTimeout(() => setStep(3), 150);
+                            }}
+                            className={cn(
+                                "flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer active:scale-[0.98]",
+                                booking.barber?.id === barber.id
+                                    ? "border-black bg-gray-50 ring-1 ring-black/5"
+                                    : "border-gray-100 bg-white hover:border-gray-300"
+                            )}
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center text-xl font-bold text-gray-400 relative overflow-hidden ring-2 ring-white shadow-sm">
+                                    {/* Placeholder for image */}
+                                    {barber.nickname?.charAt(0) || barber.name.charAt(0)}
+                                </div>
+                                <div>
+                                    <div className="font-bold text-lg mb-0.5 text-gray-900">{barber.nickname || barber.name}</div>
+                                    <div className="text-gray-400 text-sm font-medium">{barber.role}</div>
+                                </div>
                             </div>
-                            <div>
-                                <div className="font-bold text-lg mb-0.5">{barber.nickname || barber.name}</div>
-                                <div className="text-gray-400 text-sm">{barber.role}</div>
+                            <div className="text-right">
+                                {isPromo && <div className="text-[10px] font-bold text-green-600 uppercase tracking-widest mb-0.5">Promo</div>}
+                                <div className={cn("font-bold", isPromo ? "text-green-600" : "text-gray-900")}>
+                                    {formatPrice(effectivePrice)}
+                                </div>
+                                {booking.barber?.id === barber.id && <Check className="w-5 h-5 text-black ml-auto mt-1" />}
                             </div>
                         </div>
-                        {booking.barber?.id === barber.id && <Check className="w-5 h-5 text-black" />}
-                    </div>
-                ))}
+                    );
+                })}
                 {barbers.length === 0 && !isLoading && (
                     <div className="text-center text-gray-400 py-10">ไม่พบข้อมูลช่าง</div>
                 )}
@@ -396,163 +474,179 @@ export default function BookingPage() {
     );
 
     // Step 3: Date & Time
-    const StepDateTime = () => (
-        <div className="p-6 space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
-            <h2 className="text-2xl font-bold mb-2">เลือกวันและเวลา</h2>
+    const StepDateTime = () => {
+        // Prevent hydration errors with dates
+        const [isMounted, setIsMounted] = useState(false);
+        useEffect(() => setIsMounted(true), []);
 
-            {/* Date Picker */}
-            <div>
-                <div className="flex gap-3 overflow-x-auto pb-4 -mx-6 px-6 hide-scrollbar snap-x">
-                    {AVAILABLE_DATES.map((date, idx) => {
-                        const isSelected = booking.date?.toDateString() === date.toDateString();
-                        return (
-                            <div
-                                key={idx}
-                                onClick={() => {
-                                    setBooking(b => ({ ...b, date, time: null })); // Reset time on date change
-                                    setUnavailableSlots(new Set()); // Reset avail until fetched
-                                }}
-                                className={cn(
-                                    "flex flex-col items-center justify-center min-w-[70px] h-[90px] rounded-2xl border transition-all cursor-pointer snap-start flex-none",
-                                    isSelected
-                                        ? "bg-black text-white border-black shadow-lg shadow-black/20"
-                                        : "bg-white border-gray-100 text-gray-400 hover:border-gray-300"
-                                )}
-                            >
-                                <div className="text-xs font-medium mb-1">{dayOfWeek(date)}</div>
-                                <div className={cn("text-2xl font-bold mb-2", isSelected ? "text-white" : "text-black")}>{dayNumber(date)}</div>
+        if (!isMounted) return null;
 
-                                {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
+        return (
+            <div className="p-6 space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
+                <h2 className="text-2xl font-bold mb-2">เลือกวันและเวลา</h2>
 
-            {/* Time Picker */}
-            {booking.date && (
+                {/* Date Picker */}
                 <div>
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="text-sm font-bold text-gray-900">เวลาที่ว่าง</div>
-                        {isLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                        {TIME_SLOTS.map((time) => {
-                            const isSelected = booking.time === time;
-                            const isUnavailable = unavailableSlots.has(time);
-
+                    <div className="flex gap-3 overflow-x-auto pb-4 -mx-6 px-6 hide-scrollbar snap-x">
+                        {AVAILABLE_DATES.map((date, idx) => {
+                            const isSelected = booking.date?.toDateString() === date.toDateString();
                             return (
-                                <button
-                                    key={time}
-                                    disabled={isUnavailable}
-                                    onClick={() => setBooking(b => ({ ...b, time }))}
+                                <div
+                                    key={idx}
+                                    onClick={() => {
+                                        setBooking(b => ({ ...b, date, time: null })); // Reset time on date change
+                                        setUnavailableSlots(new Set()); // Reset avail until fetched
+                                    }}
                                     className={cn(
-                                        "py-3 rounded-xl text-sm font-semibold border transition-all relative overflow-hidden",
+                                        "flex flex-col items-center justify-center min-w-[70px] h-[90px] rounded-2xl border transition-all cursor-pointer snap-start flex-none",
                                         isSelected
-                                            ? "bg-black text-white border-black shadow-md z-10"
-                                            : "bg-white text-black border-gray-100 hover:border-black",
-                                        isUnavailable && "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed hover:border-gray-100"
+                                            ? "bg-black text-white border-black shadow-lg shadow-black/20"
+                                            : "bg-white border-gray-100 text-gray-400 hover:border-gray-300"
                                     )}
                                 >
-                                    {time}
-                                    {isUnavailable && (
-                                        <span className="absolute inset-0 flex items-center justify-center bg-gray-50/80 text-[10px] font-bold text-red-500 uppercase tracking-wider">
-                                            เต็ม (FULL)
-                                        </span>
-                                    )}
-                                </button>
-                            )
+                                    <div className="text-xs font-medium mb-1">{dayOfWeek(date)}</div>
+                                    <div className={cn("text-2xl font-bold mb-2", isSelected ? "text-white" : "text-black")}>{dayNumber(date)}</div>
+
+                                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                </div>
+                            );
                         })}
                     </div>
-                    {/* Helper text for duration */}
-                    <div className="mt-4 text-xs text-gray-400 text-center">
-                        * บริการใช้เวลาประมาณ {booking.service?.duration || 1} ชั่วโมง
-                    </div>
                 </div>
-            )}
-        </div>
-    );
+
+                {/* Time Picker */}
+                {booking.date && (
+                    <div>
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="text-sm font-bold text-gray-900">เวลาที่ว่าง</div>
+                            {isLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-3">
+                            {TIME_SLOTS.map((time) => {
+                                const isSelected = booking.time === time;
+                                const isUnavailable = unavailableSlots.has(time);
+
+                                return (
+                                    <button
+                                        key={time}
+                                        disabled={isUnavailable}
+                                        onClick={() => setBooking(b => ({ ...b, time }))}
+                                        className={cn(
+                                            "py-3 rounded-xl text-sm font-semibold border transition-all relative overflow-hidden",
+                                            isSelected
+                                                ? "bg-black text-white border-black shadow-md z-10"
+                                                : "bg-white text-black border-gray-100 hover:border-black",
+                                            isUnavailable && "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed hover:border-gray-100"
+                                        )}
+                                    >
+                                        {time}
+                                        {isUnavailable && (
+                                            <span className="absolute inset-0 flex items-center justify-center bg-gray-50/80 text-[10px] font-bold text-red-500 uppercase tracking-wider">
+                                                เต็ม (FULL)
+                                            </span>
+                                        )}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                        {/* Helper text for duration */}
+                        <div className="mt-4 text-xs text-gray-400 text-center">
+                            * บริการใช้เวลาประมาณ {booking.service?.duration || 1} ชั่วโมง
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     // Step 4: Contact & Payment
-    const StepSummary = () => (
-        <div className="p-6 space-y-6 animate-in fade-in slide-in-from-right-8 duration-500 pb-24">
-            <h2 className="text-2xl font-bold">ข้อมูลติดต่อ & ชำระเงิน</h2>
+    const StepSummary = () => {
+        const finalPrice = getFinalPrice();
+        const [isMounted, setIsMounted] = useState(false);
+        useEffect(() => setIsMounted(true), []);
 
-            {/* Form */}
-            <div className="space-y-4">
-                <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 block">ชื่อของคุณ</label>
-                    <input
-                        type="text"
-                        value={booking.customer.name}
-                        onChange={e => setBooking(b => ({ ...b, customer: { ...b.customer, name: e.target.value } }))}
-                        className="w-full p-4 rounded-xl bg-gray-50 border-none font-medium text-black placeholder:text-gray-400 focus:ring-2 focus:ring-black transition-all outline-none"
-                        placeholder="กรอกชื่อของคุณ"
-                    />
-                </div>
-                <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 block">เบอร์โทรศัพท์</label>
-                    <input
-                        type="tel"
-                        value={booking.customer.phone}
-                        onChange={e => setBooking(b => ({ ...b, customer: { ...b.customer, phone: e.target.value } }))}
-                        className="w-full p-4 rounded-xl bg-gray-50 border-none font-medium text-black placeholder:text-gray-400 focus:ring-2 focus:ring-black transition-all outline-none"
-                        placeholder="08x-xxx-xxxx"
-                    />
-                </div>
-            </div>
+        if (!isMounted) return null; // Avoid date hydration mismatches in summary
 
-            {/* Summary Box */}
-            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-3">
-                <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-900 font-medium">บริการ</span>
-                    <span className="font-bold">{booking.service?.name}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-900 font-medium">ช่าง</span>
-                    <span className="font-bold">{booking.barber?.nickname || booking.barber?.name}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-900 font-medium">วันเวลา</span>
-                    <span className="font-bold text-black">{formatSelectedDate(booking.date)} / {booking.time}</span>
-                </div>
-                <div className="h-px bg-gray-100 my-2" />
-                <div className="flex justify-between items-center">
-                    <span className="text-gray-900 font-medium">ยอดรวม</span>
-                    <span className="font-bold text-xl">{formatPrice(booking.service?.price || 0)}</span>
-                </div>
-            </div>
+        return (
+            <div className="p-6 space-y-6 animate-in fade-in slide-in-from-right-8 duration-500 pb-24">
+                <h2 className="text-2xl font-bold">ข้อมูลติดต่อ & ชำระเงิน</h2>
 
-            {/* Payment Blue Box */}
-            <div className="bg-blue-600 rounded-2xl p-5 text-white shadow-lg shadow-blue-200 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10" />
-
-                <div className="relative z-10">
-                    <div className="text-blue-100 text-sm mb-1">มัดจำการจอง</div>
-                    <div className="text-3xl font-bold mb-4">150 ฿</div>
-
-                    <div className="flex items-center gap-3 mb-6 bg-blue-500/30 p-3 rounded-xl backdrop-blur-sm border border-white/10">
-                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-green-600 font-bold text-xs shrink-0">
-                            KB
-                        </div>
-                        <div>
-                            <div className="text-xs text-blue-100">ธนาคารกสิกรไทย</div>
-                            <div className="font-bold tracking-wide">012-3-45678-9</div>
-                        </div>
+                {/* Form */}
+                <div className="space-y-4">
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 block">ชื่อของคุณ</label>
+                        <input
+                            type="text"
+                            value={booking.customer.name}
+                            onChange={e => setBooking(b => ({ ...b, customer: { ...b.customer, name: e.target.value } }))}
+                            className="w-full p-4 rounded-xl bg-gray-50 border-none font-medium text-black placeholder:text-gray-400 focus:ring-2 focus:ring-black transition-all outline-none"
+                            placeholder="กรอกชื่อของคุณ"
+                        />
                     </div>
-
-                    <button className="w-full bg-white/10 hover:bg-white/20 transition-colors border-2 border-dashed border-white/30 rounded-xl py-3 flex items-center justify-center gap-2 text-sm font-medium">
-                        <Upload className="w-4 h-4" />
-                        แนบสลิปโอนเงิน (จำลอง)
-                    </button>
-                    <div className="text-[10px] text-blue-200 mt-2 text-center opacity-70">
-                        * ในเวอร์ชั่น Demo นี้ ไม่จำเป็นต้องแนบสลิปจริง
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 block">เบอร์โทรศัพท์</label>
+                        <input
+                            type="tel"
+                            value={booking.customer.phone}
+                            onChange={e => setBooking(b => ({ ...b, customer: { ...b.customer, phone: e.target.value } }))}
+                            className="w-full p-4 rounded-xl bg-gray-50 border-none font-medium text-black placeholder:text-gray-400 focus:ring-2 focus:ring-black transition-all outline-none"
+                            placeholder="08x-xxx-xxxx"
+                        />
                     </div>
                 </div>
+
+                {/* Summary Box */}
+                <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-3">
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-900 font-medium">บริการ</span>
+                        <span className="font-bold">{booking.service?.name}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-900 font-medium">ช่าง</span>
+                        <span className="font-bold">{booking.barber?.nickname || booking.barber?.name}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-900 font-medium">วันเวลา</span>
+                        <span className="font-bold text-black">{formatSelectedDate(booking.date)} / {booking.time}</span>
+                    </div>
+                    <div className="h-px bg-gray-100 my-2" />
+                    <div className="flex justify-between items-center">
+                        <span className="text-gray-900 font-medium">ยอดรวม</span>
+                        <span className="font-bold text-xl">{formatPrice(finalPrice)}</span>
+                    </div>
+                </div>
+
+                {/* Payment Blue Box */}
+                <div className="bg-blue-600 rounded-2xl p-5 text-white shadow-lg shadow-blue-200 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10" />
+
+                    <div className="relative z-10">
+                        <div className="text-blue-100 text-sm mb-1">มัดจำการจอง</div>
+                        <div className="text-3xl font-bold mb-4">150 ฿</div>
+
+                        <div className="flex items-center gap-3 mb-6 bg-blue-500/30 p-3 rounded-xl backdrop-blur-sm border border-white/10">
+                            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-green-600 font-bold text-xs shrink-0">
+                                KB
+                            </div>
+                            <div>
+                                <div className="text-xs text-blue-100">ธนาคารกสิกรไทย</div>
+                                <div className="font-bold tracking-wide">012-3-45678-9</div>
+                            </div>
+                        </div>
+
+                        <button className="w-full bg-white/10 hover:bg-white/20 transition-colors border-2 border-dashed border-white/30 rounded-xl py-3 flex items-center justify-center gap-2 text-sm font-medium">
+                            <Upload className="w-4 h-4" />
+                            แนบสลิปโอนเงิน (จำลอง)
+                        </button>
+                        <div className="text-[10px] text-blue-200 mt-2 text-center opacity-70">
+                            * ในเวอร์ชั่น Demo นี้ ไม่จำเป็นต้องแนบสลิปจริง
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     const SuccessModal = () => (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
@@ -587,7 +681,7 @@ export default function BookingPage() {
                 {step < 4 && step > 1 && (
                     <div className="flex justify-between items-center mb-4 px-2">
                         <div className="text-xs font-semibold text-gray-500">
-                            {booking.service?.name} {booking.service?.price && `• ${formatPrice(booking.service.price)}`}
+                            {booking.service?.name} {booking.service?.price && `• ${formatPrice(getFinalPrice() || booking.service.price)}`}
                         </div>
                     </div>
                 )}
