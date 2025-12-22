@@ -40,6 +40,7 @@ interface Barber {
 interface BarberPricing {
   price_normal: number;
   price_promo?: number | null;
+  commission_fixed?: number;
 }
 
 interface Service {
@@ -324,6 +325,7 @@ export default function Home() {
         phone: phone,
         slipUrl,
         price: finalPrice,
+        commissionAmount: selectedBarber && barberPricingMap[selectedBarber.id]?.commission_fixed ? barberPricingMap[selectedBarber.id].commission_fixed : 0,
         duration_min: selectedService.duration_min,
         status: "pending"
       });

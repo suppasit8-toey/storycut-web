@@ -186,7 +186,8 @@ export const getBarberPricesForService = async (serviceId) => {
             const data = doc.data();
             pricing[data.barber_id] = {
                 price_normal: data.price_normal,
-                price_promo: data.price_promo
+                price_promo: data.price_promo,
+                commission_fixed: data.commission_fixed
             };
         });
         return pricing;
