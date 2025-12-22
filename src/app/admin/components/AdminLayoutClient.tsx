@@ -34,7 +34,7 @@ const MENU_ITEMS = [
     { label: "Barbers", icon: Scissors, href: "/admin/barbers" },
     { label: "Services", icon: ClipboardList, href: "/admin/services" },
     { label: "Branches", icon: MapPin, href: "/admin/branches" },
-    { label: "Salary", icon: DollarSign, href: "/admin/salary" },
+    { label: "Finance", icon: DollarSign, href: "/admin/finance" },
     { label: "Account", icon: User, href: "/admin/account" },
     { label: "Voucher", icon: Ticket, href: "/admin/voucher" },
 ];

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { formatDateDDMMYYYY, parseDDMMYYYY } from "@/utils/dateUtils";
+import { ArrowLeft, Trash2 } from "lucide-react";
 
 export default function BranchDetailPage() {
     const { slug } = useParams();
@@ -17,6 +18,7 @@ export default function BranchDetailPage() {
     const [formData, setFormData] = useState({
         name: "",
         locationLink: "",
+        lineContactLink: "", // Added Field
         adminPhone: "",
         openTime: "",
         closeTime: "",
@@ -25,7 +27,7 @@ export default function BranchDetailPage() {
         accountName: "",
     });
 
-    const [holidays, setHolidays] = useState<{ date: string }[]>([]); // Using object for future proofing/consistency
+    const [holidays, setHolidays] = useState<{ date: string }[]>([]);
     const [newHolidayDate, setNewHolidayDate] = useState("");
 
     const branchRef = doc(db, "branches", slug as string);
@@ -43,6 +45,7 @@ export default function BranchDetailPage() {
                 setFormData({
                     name: data.name || "",
                     locationLink: data.locationLink || "",
+                    lineContactLink: data.lineContactLink || "", // Load It
                     adminPhone: data.adminPhone || "",
                     openTime: data.openTime || "",
                     closeTime: data.closeTime || "",
@@ -52,7 +55,6 @@ export default function BranchDetailPage() {
                 });
                 setHolidays(data.holidays || []);
             } else {
-                // Handle 404
                 console.error("Branch not found");
                 router.push("/admin/branches");
             }
@@ -87,16 +89,9 @@ export default function BranchDetailPage() {
     const handleAddHoliday = async () => {
         if (!newHolidayDate) return;
 
-        // Convert date picker format (YYYY-MM-DD) to DD/MM/YYYY for consistency with app standards
-        // Or keep YYYY-MM-DD for storage? Utils seem to prefer DD/MM/YYYY. 
-        // Let's standardize to DD/MM/YYYY for storage/display as per utils.
-        // Date picker gives YYYY-MM-DD.
-
-        // Parse input date (YYYY-MM-DD)
         const [y, m, d] = newHolidayDate.split("-");
         const formattedDate = `${d}/${m}/${y}`; // DD/MM/YYYY
 
-        // Check if already exists
         if (holidays.some(h => h.date === formattedDate)) {
             alert("Holiday already exists for this date.");
             return;
@@ -139,78 +134,90 @@ export default function BranchDetailPage() {
     }
 
     return (
-        <div className="min-h-screen bg-black text-white p-6 md:p-10 pb-20">
+        <div className="min-h-screen bg-black text-white p-6 md:p-10 pb-32">
             <div className="max-w-4xl mx-auto space-y-8">
 
                 {/* Header */}
-                <div className="flex items-center gap-4">
-                    <button onClick={() => router.push("/admin/branches")} className="text-gray-400 hover:text-white transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                        </svg>
+                <div className="flex items-center gap-4 mb-4">
+                    <button onClick={() => router.push("/admin/branches")} className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-all">
+                        <ArrowLeft className="w-5 h-5" />
                     </button>
-                    <h1 className="text-3xl font-bold tracking-tight">{formData.name || slug}</h1>
+                    <div>
+                        <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase font-inter">{formData.name || slug}</h1>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Branch Configuration</p>
+                    </div>
                 </div>
 
-                <form onSubmit={handleSaveSettings} className="space-y-8">
+                <form onSubmit={handleSaveSettings} className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {/* Section 1: General Info */}
-                    <section className="bg-[#1A1A1A] rounded-[32px] p-8 border border-transparent">
-                        <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-white"></span>
+                    <section className="bg-[#1A1A1A] rounded-[32px] p-8 border border-white/5 shadow-2xl">
+                        <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
+                            <span className="w-3 h-3 rounded-full bg-white shadow-[0_0_10px_white]"></span>
                             General Info
                         </h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-400 mb-2">Branch Name</label>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Branch Name</label>
                                 <input
                                     type="text"
                                     name="name"
                                     value={formData.name}
                                     onChange={handleChange}
-                                    className="w-full bg-black border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-white transition-colors"
+                                    className="w-full bg-black border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-white/40 transition-all"
                                 />
                             </div>
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-400 mb-2">Location Link (Google Maps)</label>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Location Link (Google Maps)</label>
                                 <input
                                     type="url"
                                     name="locationLink"
                                     value={formData.locationLink}
                                     onChange={handleChange}
                                     placeholder="https://maps.google.com/..."
-                                    className="w-full bg-black border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-white transition-colors"
+                                    className="w-full bg-black border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-white/40 transition-all"
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Line@ Link (Official Account)</label>
+                                <input
+                                    type="url"
+                                    name="lineContactLink"
+                                    value={formData.lineContactLink}
+                                    onChange={handleChange}
+                                    placeholder="https://line.me/ti/p/@storycut"
+                                    className="w-full bg-black border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-white/40 transition-all"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-2">Admin Phone</label>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Admin Phone</label>
                                 <input
                                     type="tel"
                                     name="adminPhone"
                                     value={formData.adminPhone}
                                     onChange={handleChange}
                                     placeholder="0812345678"
-                                    className="w-full bg-black border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-white transition-colors"
+                                    className="w-full bg-black border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-white/40 transition-all"
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-2">Open Time</label>
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Open Time</label>
                                     <input
                                         type="time"
                                         name="openTime"
                                         value={formData.openTime}
                                         onChange={handleChange}
-                                        className="w-full bg-black border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-white transition-colors"
+                                        className="w-full bg-black border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-white/40 transition-all"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-2">Close Time</label>
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Close Time</label>
                                     <input
                                         type="time"
                                         name="closeTime"
                                         value={formData.closeTime}
                                         onChange={handleChange}
-                                        className="w-full bg-black border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-white transition-colors"
+                                        className="w-full bg-black border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-white/40 transition-all"
                                     />
                                 </div>
                             </div>
@@ -218,117 +225,114 @@ export default function BranchDetailPage() {
                     </section>
 
                     {/* Section 2: Financial Config */}
-                    <section className="bg-[#1A1A1A] rounded-[32px] p-8 border border-transparent">
-                        <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-white"></span>
+                    <section className="bg-[#1A1A1A] rounded-[32px] p-8 border border-white/5 shadow-2xl">
+                        <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
+                            <span className="w-3 h-3 rounded-full bg-white shadow-[0_0_10px_white]"></span>
                             Financial Config
                         </h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-400 mb-2">Bank Name</label>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Bank Name</label>
                                 <input
                                     type="text"
                                     name="bankName"
                                     value={formData.bankName}
                                     onChange={handleChange}
                                     placeholder="KBank, SCB, etc."
-                                    className="w-full bg-black border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-white transition-colors"
+                                    className="w-full bg-black border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-white/40 transition-all"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-2">Account Number</label>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Account Number</label>
                                 <input
                                     type="text"
                                     name="accountNumber"
                                     value={formData.accountNumber}
                                     onChange={handleChange}
-                                    className="w-full bg-black border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-white transition-colors"
+                                    className="w-full bg-black border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-white/40 transition-all"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-2">Account Name</label>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Account Name</label>
                                 <input
                                     type="text"
                                     name="accountName"
                                     value={formData.accountName}
                                     onChange={handleChange}
-                                    className="w-full bg-black border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-white transition-colors"
+                                    className="w-full bg-black border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-white/40 transition-all"
                                 />
                             </div>
                         </div>
                     </section>
 
-                    {/* Save Button for Sections 1 & 2 */}
-                    <div className="flex justify-end sticky bottom-6 z-10">
+                    {/* Section 3: Branch Holidays */}
+                    <section className="bg-[#1A1A1A] rounded-[32px] p-8 border border-white/5 shadow-2xl">
+                        <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
+                            <span className="w-3 h-3 rounded-full bg-white shadow-[0_0_10px_white]"></span>
+                            Branch Holidays
+                        </h2>
+                        <div className="space-y-6">
+                            <div className="flex flex-col md:flex-row gap-4 items-end">
+                                <div className="flex-1 w-full">
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Select Date</label>
+                                    <input
+                                        type="date"
+                                        value={newHolidayDate}
+                                        onChange={(e) => setNewHolidayDate(e.target.value)}
+                                        className="w-full bg-black border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-white/40 transition-all [color-scheme:dark]"
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleAddHoliday}
+                                    disabled={!newHolidayDate}
+                                    className="w-full md:w-auto bg-white/10 text-white border border-white/20 px-8 py-3.5 rounded-xl font-bold hover:bg-white/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                                >
+                                    Add Holiday
+                                </button>
+                            </div>
+
+                            <div className="mt-8">
+                                <h3 className="text-xs font-bold text-gray-500 mb-4 uppercase tracking-widest">Upcoming Holidays</h3>
+                                {holidays.length === 0 ? (
+                                    <div className="p-8 text-center text-gray-600 border border-white/5 rounded-2xl border-dashed">No holidays added.</div>
+                                ) : (
+                                    <div className="grid gap-3">
+                                        {holidays
+                                            .sort((a, b) => {
+                                                const [d1, m1, y1] = a.date.split("/").map(Number);
+                                                const [d2, m2, y2] = b.date.split("/").map(Number);
+                                                return new Date(y1, m1 - 1, d1).getTime() - new Date(y2, m2 - 1, d2).getTime();
+                                            })
+                                            .map((holiday, idx) => (
+                                                <div key={idx} className="flex justify-between items-center bg-black p-4 rounded-xl border border-white/10 group hover:border-white/30 transition-all">
+                                                    <span className="font-mono text-lg font-bold tracking-tight">{holiday.date}</span>
+                                                    <button
+                                                        onClick={() => handleDeleteHoliday(holiday)}
+                                                        className="text-gray-500 hover:text-red-500 hover:bg-red-500/10 transition-all p-2 rounded-lg"
+                                                        title="Delete Holiday"
+                                                    >
+                                                        <Trash2 className="w-5 h-5" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Floating Save Button */}
+                    <div className="fixed bottom-6 right-6 md:absolute md:bottom-auto md:right-auto md:relative flex justify-end z-20">
                         <button
                             type="submit"
                             disabled={saving}
-                            className="bg-white text-black px-8 py-4 rounded-full font-bold text-lg shadow-xl hover:bg-gray-200 transition-all disabled:opacity-50"
+                            className="bg-white text-black px-8 py-4 rounded-full font-black text-lg shadow-2xl hover:scale-105 active:scale-95 transition-all disabled:opacity-70 disabled:scale-100"
                         >
-                            {saving ? "Saving..." : "Save Settings"}
+                            {saving ? "Saving..." : "Save Changes"}
                         </button>
                     </div>
                 </form>
-
-                {/* Section 3: Branch Holidays */}
-                <section className="bg-[#1A1A1A] rounded-[32px] p-8 border border-transparent">
-                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-white"></span>
-                        Branch Holidays
-                    </h2>
-                    <div className="space-y-6">
-                        <div className="flex flex-col md:flex-row gap-4 items-end">
-                            <div className="flex-1 w-full">
-                                <label className="block text-sm font-medium text-gray-400 mb-2">Select Date</label>
-                                <input
-                                    type="date"
-                                    value={newHolidayDate}
-                                    onChange={(e) => setNewHolidayDate(e.target.value)}
-                                    className="w-full bg-black border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-white transition-colors [color-scheme:dark]"
-                                />
-                            </div>
-                            <button
-                                type="button"
-                                onClick={handleAddHoliday}
-                                disabled={!newHolidayDate}
-                                className="w-full md:w-auto bg-white/10 text-white border border-white/20 px-6 py-3 rounded-lg font-medium hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                            >
-                                Add Holiday
-                            </button>
-                        </div>
-
-                        <div className="mt-8">
-                            <h3 className="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wider">Upcoming Holidays</h3>
-                            {holidays.length === 0 ? (
-                                <p className="text-gray-600 italic">No holidays added.</p>
-                            ) : (
-                                <div className="grid gap-3">
-                                    {holidays
-                                        .sort((a, b) => {
-                                            // dd/mm/yyyy sort
-                                            const [d1, m1, y1] = a.date.split("/").map(Number);
-                                            const [d2, m2, y2] = b.date.split("/").map(Number);
-                                            return new Date(y1, m1 - 1, d1).getTime() - new Date(y2, m2 - 1, d2).getTime();
-                                        })
-                                        .map((holiday, idx) => (
-                                            <div key={idx} className="flex justify-between items-center bg-black p-4 rounded-xl border border-gray-800 group hover:border-gray-700 transition-colors">
-                                                <span className="font-mono text-lg">{holiday.date}</span>
-                                                <button
-                                                    onClick={() => handleDeleteHoliday(holiday)}
-                                                    className="text-gray-500 hover:text-red-400 transition-colors p-2"
-                                                    title="Delete Holiday"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                        ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </section>
 
             </div>
         </div>

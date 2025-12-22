@@ -47,6 +47,7 @@ type BarberServiceMapping = {
     price_normal: number;
     price_promo?: number | null;
     promotion_active?: boolean;
+    commission_fixed?: number;
     enabled: boolean;
 };
 
@@ -285,7 +286,11 @@ export default function BookingPage() {
                 customerPhone: booking.customer.phone,
                 status: 'pending',
                 duration: booking.service.duration || 1,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                commissionAmount: (() => {
+                    const mapping = barberServices.find(m => m.service_id === booking.service!.id && m.barber_id === booking.barber!.id);
+                    return mapping && mapping.enabled ? (mapping.commission_fixed || 0) : 0;
+                })()
             };
 
             await addDoc(collection(db, "bookings"), bookingData);

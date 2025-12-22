@@ -5,12 +5,13 @@ import { collection, getDocs, doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Plus } from "lucide-react";
 
 export default function BranchesPage() {
     const [branches, setBranches] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [formData, setFormData] = useState({ name: "", slug: "" });
+    const [formData, setFormData] = useState({ name: "", slug: "", lineContactLink: "" });
     const [error, setError] = useState("");
     const [creating, setCreating] = useState(false);
 
@@ -40,7 +41,7 @@ export default function BranchesPage() {
         setError("");
         setCreating(true);
 
-        const { name, slug } = formData;
+        const { name, slug, lineContactLink } = formData;
 
         // Basic Slug Validation
         if (!/^[a-z0-9-]+$/.test(slug)) {
@@ -64,6 +65,7 @@ export default function BranchesPage() {
             await setDoc(docRef, {
                 name,
                 slug,
+                lineContactLink,
                 createdAt: new Date().toISOString(),
                 // Initialize other fields as empty or defaults if needed
                 active: true
@@ -81,20 +83,19 @@ export default function BranchesPage() {
     return (
         <div className="min-h-screen bg-black text-white p-6 md:p-10">
             <div className="max-w-7xl mx-auto">
-                <div className="flex justify-between items-center mb-8">
+                <div className="flex justify-between items-end mb-8">
                     <div>
                         <h1 className="text-4xl font-black italic tracking-tighter text-white mb-2 font-inter uppercase">BRANCHES</h1>
                         <p className="text-gray-400 text-xs font-bold uppercase tracking-[0.2em]">BRANCH LOCATIONS</p>
                     </div>
+
+                    {/* Icon-only Button for Mobile Optimization */}
                     <button
                         onClick={() => setIsModalOpen(true)}
-                        className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                        className="w-12 h-12 bg-white text-black rounded-lg flex items-center justify-center hover:bg-gray-200 transition-all shadow-lg hover:scale-105 active:scale-95"
+                        aria-label="Create Branch"
                     >
-                        {/* Simple Plus Icon SVG */}
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Create Branch
+                        <Plus className="w-6 h-6 stroke-[3]" />
                     </button>
                 </div>
 
@@ -135,9 +136,9 @@ export default function BranchesPage() {
 
                 {/* Modal */}
                 {isModalOpen && (
-                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                        <div className="bg-[#1A1A1A] rounded-2xl w-full max-w-md p-6 border border-gray-800 shadow-2xl">
-                            <h2 className="text-2xl font-bold mb-6">New Branch</h2>
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                        <div className="bg-[#1A1A1A] rounded-[32px] w-full max-w-md p-8 border border-gray-800 shadow-2xl">
+                            <h2 className="text-2xl font-black italic text-white mb-6 uppercase tracking-tight">New Branch</h2>
 
                             <form onSubmit={handleCreate} className="space-y-4">
                                 <div>
@@ -163,6 +164,17 @@ export default function BranchesPage() {
                                         placeholder="e.g. siam-branch"
                                     />
                                     <p className="text-xs text-gray-500 mt-1">Only lowercase letters, numbers, and hyphens.</p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Line@ Link (Optional)</label>
+                                    <input
+                                        type="url"
+                                        value={formData.lineContactLink}
+                                        onChange={(e) => setFormData({ ...formData, lineContactLink: e.target.value })}
+                                        className="w-full bg-black border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-white transition-colors"
+                                        placeholder="https://line.me/ti/p/..."
+                                    />
                                 </div>
 
                                 {error && (

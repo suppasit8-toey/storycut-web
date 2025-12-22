@@ -273,7 +273,7 @@ export default function BarbersPage() {
                         <h1 className="text-4xl font-black italic tracking-tighter text-white mb-2 font-inter uppercase">BARBERS</h1>
                         <p className="text-gray-400 text-xs font-bold uppercase tracking-[0.2em]">STAFF MANAGEMENT</p>
                     </div>
-                    <div className="flex gap-4 w-full md:w-auto">
+                    <div className="flex gap-4 w-full md:w-auto items-center">
                         <div className="relative flex-1 md:w-64">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                             <input
@@ -284,11 +284,13 @@ export default function BarbersPage() {
                                 className="w-full bg-[#1A1A1A] border border-gray-800 rounded-full pl-10 pr-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-white transition-colors"
                             />
                         </div>
+                        {/* Icon-only Button for Mobile Optimization */}
                         <button
                             onClick={() => handleOpenModal()}
-                            className="bg-white text-black px-6 py-3 rounded-full font-bold text-sm hover:bg-gray-200 transition-colors flex items-center gap-2 whitespace-nowrap"
+                            className="w-12 h-12 bg-white text-black rounded-lg flex items-center justify-center hover:bg-gray-200 transition-all shadow-lg hover:scale-105 active:scale-95"
+                            aria-label="Add Barber"
                         >
-                            <Plus className="w-4 h-4" /> Add Barber
+                            <Plus className="w-6 h-6 stroke-[3]" />
                         </button>
                     </div>
                 </header>
@@ -300,7 +302,11 @@ export default function BarbersPage() {
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {filteredBarbers.map((barber) => (
-                            <div key={barber.id} className="bg-[#1A1A1A] rounded-[32px] p-6 hover:bg-[#222] transition-colors border border-transparent hover:border-gray-800 group relative">
+                            <div
+                                key={barber.id}
+                                onClick={() => handleOpenModal(barber)}
+                                className="bg-[#1A1A1A] rounded-[32px] p-6 hover:bg-[#222] transition-all duration-300 border border-transparent hover:border-gray-800 group relative cursor-pointer hover:scale-[0.98]"
+                            >
                                 <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
                                     <button
                                         onClick={(e) => { e.stopPropagation(); handleOpenModal(barber); }}

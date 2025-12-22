@@ -127,7 +127,7 @@ export default function ServicesPage() {
                         <h1 className="text-4xl font-black italic tracking-tighter text-white mb-2 font-inter uppercase">SERVICES</h1>
                         <p className="text-gray-400 text-xs font-bold uppercase tracking-[0.2em]">SERVICE MENU</p>
                     </div>
-                    <div className="flex gap-4 w-full md:w-auto">
+                    <div className="flex gap-4 w-full md:w-auto items-center">
                         <div className="relative flex-1 md:w-64">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                             <input
@@ -138,11 +138,13 @@ export default function ServicesPage() {
                                 className="w-full bg-[#1A1A1A] border border-gray-800 rounded-full pl-10 pr-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-white transition-colors"
                             />
                         </div>
+                        {/* Icon-only Button for Mobile Optimization */}
                         <button
                             onClick={() => handleOpenModal()}
-                            className="bg-white text-black px-6 py-3 rounded-full font-bold text-sm hover:bg-gray-200 transition-colors flex items-center gap-2 whitespace-nowrap"
+                            className="w-12 h-12 bg-white text-black rounded-lg flex items-center justify-center hover:bg-gray-200 transition-all shadow-lg hover:scale-105 active:scale-95"
+                            aria-label="Add Service"
                         >
-                            <Plus className="w-4 h-4" /> Add Service
+                            <Plus className="w-6 h-6 stroke-[3]" />
                         </button>
                     </div>
                 </header>
@@ -154,7 +156,11 @@ export default function ServicesPage() {
                 ) : (
                     <div className="grid grid-cols-1 gap-4">
                         {filteredServices.map((service) => (
-                            <div key={service.id} className="bg-[#1A1A1A] rounded-[32px] p-8 flex flex-col md:flex-row items-center justify-between border border-transparent hover:border-gray-800 transition-colors group">
+                            <div
+                                key={service.id}
+                                onClick={() => handleOpenModal(service)}
+                                className="bg-[#1A1A1A] rounded-[32px] p-8 flex flex-col md:flex-row items-center justify-between border border-transparent hover:border-gray-800 transition-all duration-300 group cursor-pointer hover:scale-[0.99]"
+                            >
                                 <div className="flex flex-col gap-1 w-full md:w-auto text-center md:text-left mb-4 md:mb-0">
                                     <h3 className="text-2xl font-bold text-white uppercase tracking-tight">{service.name_th}</h3>
                                     <div className="flex items-center justify-center md:justify-start gap-2 text-sm text-gray-400 font-medium">
@@ -174,13 +180,13 @@ export default function ServicesPage() {
 
                                     <div className="flex gap-2">
                                         <button
-                                            onClick={() => handleOpenModal(service)}
+                                            onClick={(e) => { e.stopPropagation(); handleOpenModal(service); }}
                                             className="w-10 h-10 flex items-center justify-center rounded-full bg-black border border-gray-800 text-gray-400 hover:text-white hover:border-gray-600 transition-colors"
                                         >
                                             <Edit3 className="w-4 h-4" />
                                         </button>
                                         <button
-                                            onClick={() => handleDelete(service.id)}
+                                            onClick={(e) => { e.stopPropagation(); handleDelete(service.id); }}
                                             className="w-10 h-10 flex items-center justify-center rounded-full bg-black border border-gray-800 text-gray-400 hover:text-red-400 hover:border-red-900/50 transition-colors"
                                         >
                                             <Trash2 className="w-4 h-4" />
