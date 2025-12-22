@@ -270,7 +270,7 @@ export default function BarbersPage() {
             <div className="max-w-[1600px] mx-auto">
                 <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10">
                     <div>
-                        <h1 className="text-4xl font-black italic tracking-tighter text-white mb-2 font-inter uppercase">Barbers</h1>
+                        <h1 className="text-4xl font-black italic tracking-tighter text-white mb-2 font-inter uppercase">BARBERS</h1>
                         <p className="text-gray-400 text-xs font-bold uppercase tracking-[0.2em]">STAFF MANAGEMENT</p>
                     </div>
                     <div className="flex gap-4 w-full md:w-auto">

@@ -28,6 +28,7 @@ function cn(...inputs: ClassValue[]) {
 interface Booking {
     id: string;
     customerName: string;
+    customerPhone?: string;
     phone?: string;
     serviceName: string;
     barberName: string;
@@ -143,7 +144,7 @@ export default function DashboardPage() {
         <div className="space-y-8 animate-in fade-in duration-500">
             {/* Header */}
             <div>
-                <h1 className="text-4xl font-black italic tracking-tighter text-white mb-2 font-inter uppercase">Approval Center</h1>
+                <h1 className="text-4xl font-black italic tracking-tighter text-white mb-2 font-inter uppercase">APPROVAL CENTER</h1>
                 <p className="text-gray-400 text-xs font-bold uppercase tracking-[0.2em]">REAL-TIME TASK MANAGEMENT</p>
             </div>
 
@@ -230,7 +231,7 @@ export default function DashboardPage() {
                                         {booking.createdAt && (
                                             <div className="mt-4 pt-4 border-t border-white/5 text-center">
                                                 <p className="text-[10px] text-gray-600 font-medium">
-                                                    Booked on: <span className="text-gray-400">{formatTimestamp(booking.createdAt)}</span>
+                                                    Booked on: <span className="text-gray-400" suppressHydrationWarning>{formatTimestamp(booking.createdAt)}</span>
                                                 </p>
                                             </div>
                                         )}
@@ -301,7 +302,7 @@ export default function DashboardPage() {
                                         {request.createdAt && (
                                             <div className="mt-4 pt-2 border-t border-white/5 text-right">
                                                 <p className="text-[10px] text-gray-600">
-                                                    Submitted: {formatTimestamp(request.createdAt)}
+                                                    Submitted: <span suppressHydrationWarning>{formatTimestamp(request.createdAt)}</span>
                                                 </p>
                                             </div>
                                         )}

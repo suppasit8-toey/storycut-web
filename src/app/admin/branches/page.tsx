@@ -83,7 +83,7 @@ export default function BranchesPage() {
             <div className="max-w-7xl mx-auto">
                 <div className="flex justify-between items-center mb-8">
                     <div>
-                        <h1 className="text-4xl font-black italic tracking-tighter text-white mb-2 font-inter uppercase">Branches</h1>
+                        <h1 className="text-4xl font-black italic tracking-tighter text-white mb-2 font-inter uppercase">BRANCHES</h1>
                         <p className="text-gray-400 text-xs font-bold uppercase tracking-[0.2em]">BRANCH LOCATIONS</p>
                     </div>
                     <button
