@@ -70,7 +70,7 @@ interface Booking {
     startTime: string; // "10:00"
     endTime?: string;
     date: string; // "DD/MM/YYYY"
-    status: "pending" | "confirmed" | "in_progress" | "done" | "cancelled";
+    status: "pending" | "confirmed" | "in_progress" | "done" | "cancelled" | "pending_payment";
     price: number;
     time: string;
     duration?: number;
@@ -620,7 +620,7 @@ export default function StaffPage() {
             const updateData: any = { status };
             if (status === 'in_progress') {
                 updateData.stats_actual_start = serverTimestamp();
-            } else if (status === 'done') {
+            } else if (status === 'done' || status === 'pending_payment') {
                 updateData.stats_actual_finish = serverTimestamp();
                 const bookingRef = doc(db, "bookings", id);
                 const bookingSnap = await getDoc(bookingRef);
@@ -1123,7 +1123,7 @@ export default function StaffPage() {
                         <button onClick={() => { updateStatus(selectedBooking.id, 'in_progress'); setSelectedBooking(null); }} className="w-full bg-black text-white py-5 rounded-[24px] font-black uppercase tracking-widest hover:bg-gray-900 active:scale-95 transition-all shadow-xl flex items-center justify-center gap-2 group"><Scissors className="w-5 h-5 group-hover:rotate-12 transition-transform" /> Start Job</button>
                     )}
                     {selectedBooking.status === 'in_progress' && (
-                        <button onClick={() => { updateStatus(selectedBooking.id, 'done'); setSelectedBooking(null); }} className="w-full bg-green-500 text-white py-5 rounded-[24px] font-black uppercase tracking-widest hover:bg-green-600 active:scale-95 transition-all shadow-xl flex items-center justify-center gap-2"><CheckCircle2 className="w-5 h-5" /> Finish Job</button>
+                        <button onClick={() => { updateStatus(selectedBooking.id, 'pending_payment'); setSelectedBooking(null); }} className="w-full bg-green-500 text-white py-5 rounded-[24px] font-black uppercase tracking-widest hover:bg-green-600 active:scale-95 transition-all shadow-xl flex items-center justify-center gap-2"><CheckCircle2 className="w-5 h-5" /> Finish Job</button>
                     )}
                 </div>
             </div>

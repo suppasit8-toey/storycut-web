@@ -78,7 +78,7 @@ function StatusContent() {
             <header className="w-full max-w-[400px] flex justify-between items-center px-6 py-6 text-white shrink-0">
                 <div className="flex items-center gap-4">
                     <button
-                        onClick={() => router.push('/')}
+                        onClick={() => router.push('/bookings')}
                         className="p-2 hover:bg-white/10 rounded-full transition-colors active:scale-90"
                     >
                         <ChevronLeft className="w-6 h-6" />
@@ -200,7 +200,17 @@ function StatusContent() {
                 </div>
             </main>
 
-            <footer className="w-full max-w-[400px] text-center p-8">
+            <div className="w-full max-w-[400px] px-8 pb-4">
+                <button
+                    onClick={() => router.push('/bookings')}
+                    className="w-full bg-black text-white py-4 rounded-[24px] font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl shadow-black/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                >
+                    <ChevronLeft className="w-4 h-4" />
+                    จองคิวใหม่ / BOOK NEW APPOINTMENT
+                </button>
+            </div>
+
+            <footer className="w-full max-w-[400px] text-center p-6 pt-2">
                 <p className="text-[10px] font-black uppercase tracking-widest text-white/20">StoryCut © 2024 • All Rights Reserved</p>
             </footer>
         </div>

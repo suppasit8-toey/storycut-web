@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { db } from "@/lib/firebase";
+import { collection, query, limit, getDocs } from "firebase/firestore";
 import {
     LayoutDashboard,
     Calendar,
@@ -42,9 +44,31 @@ const MENU_ITEMS = [
 const MOBILE_MAIN_ITEMS = MENU_ITEMS.slice(0, 4);
 const MOBILE_DRAWER_ITEMS = MENU_ITEMS.slice(4);
 
+
+
 export default function AdminLayoutClient({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+    const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchBrandConfig = async () => {
+            // Fetch first branch found to use as global config (Simplification for MVP)
+            try {
+                const q = query(collection(db, "branches"), limit(1));
+                const snap = await getDocs(q);
+                if (!snap.empty) {
+                    const data = snap.docs[0].data();
+                    if (data.logoHorizontalWhiteUrl) {
+                        setLogoUrl(data.logoHorizontalWhiteUrl);
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to load brand assets", e);
+            }
+        };
+        fetchBrandConfig();
+    }, []);
 
     // Active State Helper
     const isItemActive = (href: string) => {
@@ -59,16 +83,30 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
             {/* --- DESKTOP/TABLET SIDEBAR (lg and up) --- */}
             <aside className="hidden lg:flex flex-col w-72 h-screen fixed inset-y-0 left-0 border-r border-white/5 bg-[#1A1A1A] z-50 shadow-2xl">
                 <div className="p-8 flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center rotate-3 shadow-[0_0_20px_rgba(255,255,255,0.2)]">
-                        <Scissors className="w-6 h-6 text-black transform -rotate-3" />
-                    </div>
-                    <div>
-                        <h1 className="text-xl font-black italic tracking-tighter text-white leading-none">StoryCut</h1>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mt-1">Admin Portal</p>
-                    </div>
+                    {logoUrl ? (
+                        <div className="relative h-12 w-full flex items-center justify-start">
+                            <img
+                                src={logoUrl}
+                                alt="Brand Logo"
+                                className="h-full w-auto object-contain max-w-[160px]"
+                            />
+                            <p className="sr-only">Admin Portal</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center rotate-3 shadow-[0_0_20px_rgba(255,255,255,0.2)]">
+                                <Scissors className="w-6 h-6 text-black transform -rotate-3" />
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-black italic tracking-tighter text-white leading-none">StoryCut</h1>
+                                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mt-1">Admin Portal</p>
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 <div className="px-6 mb-6">
+                    {logoUrl && <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-4 px-2">Admin Portal</p>}
                     <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />
                 </div>
 

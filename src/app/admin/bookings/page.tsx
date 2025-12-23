@@ -17,7 +17,10 @@ import {
     XCircle,
     MoreHorizontal,
     Plus,
-    Phone
+    Phone,
+    Globe,
+    Store,
+    Check
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -35,6 +38,8 @@ interface Barber {
 
 interface Booking {
     id: string;
+    bookingId?: string; // Custom 6-char ID
+    bookingType?: "online" | "walk-in";
     customerName: string;
     customerPhone?: string;
     phone?: string;
@@ -47,9 +52,15 @@ interface Booking {
     duration?: number; // hours
     duration_min?: number;
     price: number;
-    status: "pending" | "confirmed" | "rejected" | "in_progress" | "done" | "cancelled";
+    status: "pending" | "confirmed" | "rejected" | "in_progress" | "pending_payment" | "done" | "cancelled";
     slipUrl?: string;
     commissionAmount?: number;
+    createdAt?: any; // Timestamp
+    stats_actual_start?: any; // Timestamp
+    stats_actual_finish?: any; // Timestamp
+    extra_fee?: number;
+    discount?: number;
+    final_price?: number;
 }
 
 interface BarberServiceConfig {
@@ -63,6 +74,7 @@ export default function AdminBookingsPage() {
     const [viewMode, setViewMode] = useState<"calendar" | "card">("calendar");
     const [currentDate, setCurrentDate] = useState(new Date());
     const [barbers, setBarbers] = useState<Barber[]>([]);
+    const [searchQuery, setSearchQuery] = useState("");
 
     // Filters
     const [selectedBarberId, setSelectedBarberId] = useState<string>("all");
@@ -107,6 +119,16 @@ export default function AdminBookingsPage() {
 
     const filteredBookings = useMemo(() => {
         return bookings.filter(b => {
+            // 0. Search Filter (High Priority)
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                const matchesId = b.bookingId?.toLowerCase().includes(q) || b.id.toLowerCase().includes(q);
+                // Also allowing search by Customer Name for convenience
+                const matchesCustomer = b.customerName.toLowerCase().includes(q);
+
+                if (!matchesId && !matchesCustomer) return false;
+            }
+
             // Common Filter: Date (Only for Calendar View primarily, but let's keep it consistent or strictly separate if needed)
             // Requirement says: 
             // Calendar View Filters: Date, Barber
@@ -135,13 +157,14 @@ export default function AdminBookingsPage() {
             }
 
             return true;
-        });
-    }, [bookings, viewMode, currentDate, selectedBarberId, selectedTimeSlot, selectedStatus]);
+        }).sort((a, b) => a.time.localeCompare(b.time));
+    }, [bookings, viewMode, currentDate, selectedBarberId, selectedTimeSlot, selectedStatus, searchQuery]);
 
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'confirmed': return "bg-green-500 text-white";
             case 'in_progress': return "bg-blue-500 text-white";
+            case 'pending_payment': return "bg-yellow-500 text-black";
             case 'done': return "bg-gray-800 text-white";
             case 'pending': return "bg-amber-500 text-white";
             case 'rejected': case 'cancelled': return "bg-red-500 text-white";
@@ -158,83 +181,95 @@ export default function AdminBookingsPage() {
         const activeBarbers = selectedBarberId === "all" ? barbers : barbers.filter(b => b.id === selectedBarberId);
 
         return (
-            <div className="bg-[#1A1A1A] rounded-[32px] border border-white/5 overflow-hidden flex flex-col h-[650px] shadow-2xl relative">
-                {/* Fixed Header timeline - Sticky Top */}
-                <div className="flex border-b border-white/5 bg-[#1A1A1A] z-20 sticky top-0 shadow-sm">
-                    <div className="w-20 shrink-0 border-r border-white/5 p-4 flex items-center justify-center text-xs font-black text-gray-500 bg-[#1A1A1A] z-30 sticky left-0">
+            <div className="bg-black rounded-[32px] border border-[#1A1A1A] overflow-hidden flex flex-col h-[650px] shadow-2xl relative">
+                {/* CSS Grid Container - Single Scrollable Area */}
+                <div
+                    className="flex-1 overflow-auto custom-scrollbar bg-black grid"
+                    style={{
+                        gridTemplateColumns: `80px repeat(${activeBarbers.length}, minmax(250px, 1fr))`,
+                        gridAutoRows: 'max-content'
+                    }}
+                >
+                    {/* --- HEADER ROW (Row 1) --- */}
+
+                    {/* Time Corner (Sticky Top + Left) */}
+                    <div className="sticky left-0 top-0 z-50 bg-black border-r border-b border-[#1A1A1A] h-[88px] flex items-center justify-center text-[10px] font-black text-gray-500 shadow-sm col-start-1 row-start-1">
                         TIME
                     </div>
-                    <div className="flex-1 flex overflow-x-auto scrollbar-hide bg-[#1A1A1A] z-20">
-                        {activeBarbers.map(barber => (
-                            <div key={barber.id} className="min-w-[180px] flex-1 border-r border-white/5 p-4 flex items-center justify-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-white/10 overflow-hidden shrink-0">
-                                    {barber.profile_image ? (
-                                        <img src={barber.profile_image} className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-white">{barber.nickname?.[0]}</div>
-                                    )}
-                                </div>
-                                <span className="text-base font-bold text-white truncate">{barber.nickname}</span>
+
+                    {/* Barber Headers (Sticky Top) */}
+                    {activeBarbers.map((barber, i) => (
+                        <div key={`header-${barber.id}`}
+                            className="sticky top-0 z-40 bg-black border-r border-b border-[#1A1A1A] p-4 flex flex-col items-center justify-center gap-2 row-start-1"
+                            style={{ gridColumn: i + 2 }}
+                        >
+                            {/* Avatar */}
+                            <div className="w-12 h-12 rounded-full bg-[#1A1A1A] overflow-hidden shrink-0 ring-2 ring-[#333]">
+                                {barber.profile_image ? (
+                                    <img src={barber.profile_image} className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white">{barber.nickname?.[0]}</div>
+                                )}
+                            </div>
+                            <span className="text-base font-bold text-white truncate text-center uppercase tracking-wide">{barber.nickname}</span>
+                        </div>
+                    ))}
+
+                    {/* --- BODY ROW (Row 2) --- */}
+
+                    {/* Time Column (Sticky Left) */}
+                    <div className="sticky left-0 z-30 bg-black border-r border-[#1A1A1A] text-right pr-4 pt-2 row-start-2 h-[1440px] shadow-[2px_0_20px_rgba(0,0,0,0.5)] col-start-1">
+                        {hours.map(h => (
+                            <div key={h} className="h-[120px] relative">
+                                <span className="-top-3 relative text-xs font-black text-gray-600 font-inter">{h}:00</span>
                             </div>
                         ))}
                     </div>
-                </div>
 
-                {/* Grid Body */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar relative bg-[#1A1A1A]">
-                    <div className="flex relative min-h-[1440px]"> {/* 12 hours * 120px */}
-                        {/* Time Column - Sticky Left */}
-                        <div className="w-20 shrink-0 border-r border-white/5 bg-[#1A1A1A] z-10 sticky left-0 text-right pr-4 pt-2 shadow-[2px_0_5px_rgba(0,0,0,0.2)]">
-                            {hours.map(h => (
-                                <div key={h} className="h-[120px] text-xs font-bold text-gray-600 relative">
-                                    <span className="-top-3 relative">{h}:00</span>
-                                </div>
-                            ))}
-                        </div>
+                    {/* Barber Content Columns */}
+                    {activeBarbers.map((barber, i) => {
+                        const bBookings = filteredBookings.filter(b => b.barberId === barber.id);
+                        return (
+                            <div key={`body-${barber.id}`}
+                                className="relative border-r border-[#1A1A1A] row-start-2 h-[1440px] bg-grid-white/[0.02]"
+                                style={{ gridColumn: i + 2 }}
+                            >
+                                {/* Horizontal Lines */}
+                                {hours.map(h => (
+                                    <div key={h} className="absolute w-full border-t border-[#1A1A1A]" style={{ top: `${(h - 10) * 120}px` }} />
+                                ))}
 
-                        {/* Barber Columns */}
-                        <div className="flex-1 flex bg-grid-white/[0.02]">
-                            {activeBarbers.map((barber) => {
-                                const bBookings = filteredBookings.filter(b => b.barberId === barber.id);
-                                return (
-                                    <div key={barber.id} className="flex-1 min-w-[180px] border-r border-white/5 relative">
-                                        {/* Horizontal Lines */}
-                                        {hours.map(h => (
-                                            <div key={h} className="absolute w-full border-t border-white/5" style={{ top: `${(h - 10) * 120}px` }} />
-                                        ))}
+                                {/* Bookings */}
+                                {bBookings.map(booking => {
+                                    const [h, m] = booking.time.split(':').map(Number);
+                                    const startMin = (h - 10) * 60 + m;
+                                    const durationMin = booking.duration_min || (booking.duration || 1) * 60;
+                                    const height = (durationMin / 60) * 120;
+                                    const top = (startMin / 60) * 120;
 
-                                        {/* Bookings */}
-                                        {bBookings.map(booking => {
-                                            const [h, m] = booking.time.split(':').map(Number);
-                                            const startMin = (h - 10) * 60 + m;
-                                            const durationMin = booking.duration_min || (booking.duration || 1) * 60;
-                                            const height = (durationMin / 60) * 120;
-                                            const top = (startMin / 60) * 120;
+                                    return (
+                                        <button
+                                            key={booking.id}
+                                            onClick={() => { setSelectedBooking(booking); setShowModal(true); }}
+                                            className={cn(
+                                                "absolute inset-x-[2px] rounded-[32px] p-3 text-left border overflow-hidden transition-all hover:z-20 hover:scale-[1.02] shadow-lg flex flex-col justify-center",
+                                                getStatusColor(booking.status),
+                                                "border-white/10"
+                                            )}
+                                            style={{ top: `${top}px`, height: `${height}px` }}
+                                        >
+                                            <div className="text-[10px] font-black uppercase tracking-widest opacity-90 mb-0.5 leading-none">{booking.time}</div>
+                                            <div className="font-bold text-sm truncate leading-tight shadow-black drop-shadow-md mb-0.5">{booking.serviceName}</div>
+                                            <div className="text-[10px] font-bold uppercase tracking-wider truncate opacity-80 flex items-center gap-1">
+                                                <User className="w-3 h-3" /> {booking.customerName}
+                                            </div>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        )
+                    })}
 
-                                            return (
-                                                <button
-                                                    key={booking.id}
-                                                    onClick={() => { setSelectedBooking(booking); setShowModal(true); }}
-                                                    className={cn(
-                                                        "absolute left-1 right-1 rounded-xl p-3 text-left border overflow-hidden transition-all hover:z-20 hover:scale-[1.02] shadow-lg",
-                                                        getStatusColor(booking.status),
-                                                        "border-white/10"
-                                                    )}
-                                                    style={{ top: `${top}px`, height: `${height}px` }}
-                                                >
-                                                    <div className="text-[11px] font-black uppercase tracking-wider opacity-90 mb-0.5">{booking.time}</div>
-                                                    <div className="font-bold text-sm truncate leading-tight shadow-black drop-shadow-md">{booking.serviceName}</div>
-                                                    <div className="text-xs font-medium truncate opacity-90 mt-1 flex items-center gap-1">
-                                                        <User className="w-3 h-3" /> {booking.customerName}
-                                                    </div>
-                                                </button>
-                                            )
-                                        })}
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </div>
                 </div>
             </div>
         );
@@ -255,7 +290,15 @@ export default function AdminBookingsPage() {
                         </div>
                         <div className="h-12 w-[1px] bg-white/10 hidden md:block"></div>
                         <div className="flex-1">
-                            <h4 className="font-bold text-2xl text-white mb-1 font-inter tracking-tight uppercase">{booking.serviceName}</h4>
+                            <div className="flex items-center gap-3">
+                                <h4 className="font-bold text-2xl text-white mb-1 font-inter tracking-tight uppercase">{booking.serviceName}</h4>
+                                <div className="flex items-center gap-1.5 opacity-50 bg-black/40 px-2 py-0.5 rounded-md border border-white/5">
+                                    {booking.bookingType === 'online' ? <Globe className="w-3 h-3 text-blue-400" /> : <Store className="w-3 h-3 text-orange-400" />}
+                                    <span className="text-[10px] font-mono text-white/60 tracking-wider">
+                                        #{booking.bookingId || booking.id.slice(-6).toUpperCase()}
+                                    </span>
+                                </div>
+                            </div>
                             <div className="flex flex-col gap-1">
                                 <span className="text-base font-bold text-gray-300 flex items-center gap-2">
                                     <User className="w-4 h-4 text-gray-500" /> {booking.customerName}
@@ -269,7 +312,10 @@ export default function AdminBookingsPage() {
 
                     <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
                         {/* Status Badge */}
-                        <div className={cn("px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/5", getStatusColor(booking.status).replace('bg-', 'text-').replace('text-white', ''))}>
+                        <div className={cn("px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/5",
+                            booking.status === 'pending_payment' ? "text-yellow-500" :
+                                getStatusColor(booking.status).replace('bg-', 'text-').replace('text-white', '').replace('text-black', '')
+                        )}>
                             {booking.status.replace('_', ' ')}
                         </div>
 
@@ -354,6 +400,20 @@ export default function AdminBookingsPage() {
 
                 {/* Filters Bar */}
                 <div className="flex flex-col md:flex-row gap-4 items-center bg-[#1A1A1A] p-4 rounded-[24px] border border-white/5">
+                    {/* Search Field (Always Visible) */}
+                    <div className="relative w-full md:w-64">
+                        <input
+                            type="text"
+                            placeholder="Search ID..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full bg-black border border-white/10 text-white text-sm font-bold rounded-xl pl-10 pr-4 py-3.5 outline-none focus:border-white/30 uppercase tracking-widest placeholder:text-gray-600"
+                        />
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                    </div>
+
+                    <div className="h-10 w-[1px] bg-white/10 hidden md:block"></div>
+
                     {/* Date Navigation (Always Visible) */}
                     <div className="flex items-center gap-4 w-full md:w-auto justify-between bg-black/20 p-2 rounded-xl border border-white/5">
                         <button onClick={() => setCurrentDate(d => { const n = new Date(d); n.setDate(n.getDate() - 1); return n; })} className="w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-lg text-white transition-all"><ChevronLeft className="w-6 h-6" /></button>
@@ -418,6 +478,7 @@ export default function AdminBookingsPage() {
                                         <option value="pending">Pending</option>
                                         <option value="confirmed">Confirmed</option>
                                         <option value="in_progress">In Progress</option>
+                                        <option value="pending_payment">Pending Payment</option>
                                         <option value="done">Done</option>
                                         <option value="cancelled">Cancelled</option>
                                     </select>
@@ -442,7 +503,17 @@ export default function AdminBookingsPage() {
                     <div className="bg-[#1A1A1A] w-full max-w-lg rounded-[40px] border border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                         <div className="p-8 pb-0 flex justify-between items-start">
                             <div>
-                                <div className="text-xs font-black uppercase tracking-widest text-[#404040] mb-2">Booking ID: {selectedBooking.id.slice(-6)}</div>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="flex items-center gap-1.5 opacity-50 bg-black/40 px-2 py-0.5 rounded-md border border-white/5">
+                                        {selectedBooking.bookingType === 'online' ? <Globe className="w-3 h-3 text-blue-400" /> : <Store className="w-3 h-3 text-orange-400" />}
+                                        <span className="text-[10px] font-mono text-white/60 tracking-wider">
+                                            #{selectedBooking.bookingId || selectedBooking.id.slice(-6).toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <div className={cn("px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/5", getStatusColor(selectedBooking.status).replace('bg-', 'text-').replace('text-white', ''))}>
+                                        {selectedBooking.status.replace('_', ' ')}
+                                    </div>
+                                </div>
                                 <h2 className="text-3xl font-black italic tracking-tighter text-white">{selectedBooking.serviceName}</h2>
                             </div>
                             <button onClick={() => setShowModal(false)} className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center text-white hover:bg-white hover:text-black transition-all">
@@ -451,28 +522,131 @@ export default function AdminBookingsPage() {
                         </div>
 
                         <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-black/30 p-5 rounded-3xl border border-white/5">
-                                    <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">Customer</div>
-                                    <div className="text-xl font-bold text-white leading-tight mb-2">{selectedBooking.customerName}</div>
-                                    <a href={`tel:${selectedBooking.customerPhone || selectedBooking.phone}`} className="inline-flex items-center gap-2 text-xs font-bold text-green-500 bg-green-500/10 px-3 py-1.5 rounded-full hover:bg-green-500 hover:text-white transition-all">
-                                        <Phone className="w-3 h-3" /> Call Customer
-                                    </a>
-                                </div>
-                                <div className="bg-black/30 p-5 rounded-3xl border border-white/5">
-                                    <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">Barber</div>
-                                    <div className="text-xl font-bold text-white leading-tight">{selectedBooking.barberName}</div>
+                            {/* STATUS TIMELINE */}
+                            <div className="bg-black/30 p-6 rounded-3xl border border-white/5 relative overflow-hidden">
+                                <div className="absolute top-1/2 left-10 right-10 h-0.5 bg-white/10 -translate-y-1/2 z-0" />
+                                <div className="relative z-10 flex justify-between items-center text-center">
+                                    {/* Step 1: Booked */}
+                                    <div className="flex flex-col items-center gap-2">
+                                        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all",
+                                            ['confirmed', 'in_progress', 'pending_payment', 'done'].includes(selectedBooking.status) ? "bg-green-500 border-green-500 text-white shadow-[0_0_10px_rgba(34,197,94,0.4)]" : "bg-black border-white/20 text-gray-500"
+                                        )}>
+                                            <Check className="w-4 h-4" />
+                                        </div>
+                                        <span className={cn("text-[10px] font-bold uppercase tracking-wider", ['confirmed', 'in_progress', 'pending_payment', 'done'].includes(selectedBooking.status) ? "text-green-500" : "text-gray-600")}>Booked</span>
+                                    </div>
+
+                                    {/* Step 2: Service */}
+                                    <div className="flex flex-col items-center gap-2">
+                                        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all",
+                                            ['in_progress', 'pending_payment', 'done'].includes(selectedBooking.status) ? "bg-blue-500 border-blue-500 text-white shadow-[0_0_10px_rgba(59,130,246,0.4)]" : "bg-black border-white/20 text-gray-500",
+                                            selectedBooking.status === 'in_progress' && "animate-pulse"
+                                        )}>
+                                            <Scissors className="w-4 h-4" />
+                                        </div>
+                                        <span className={cn("text-[10px] font-bold uppercase tracking-wider", ['in_progress', 'pending_payment', 'done'].includes(selectedBooking.status) ? "text-blue-500" : "text-gray-600")}>Service</span>
+                                    </div>
+
+                                    {/* Step 3: Payment (Pending) */}
+                                    <div className="flex flex-col items-center gap-2">
+                                        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all",
+                                            ['pending_payment', 'done'].includes(selectedBooking.status) ? "bg-yellow-500 border-yellow-500 text-white shadow-[0_0_10px_rgba(234,179,8,0.4)]" : "bg-black border-white/20 text-gray-500",
+                                            selectedBooking.status === 'pending_payment' && "animate-pulse"
+                                        )}>
+                                            <Clock className="w-4 h-4" />
+                                        </div>
+                                        <span className={cn("text-[10px] font-bold uppercase tracking-wider", ['pending_payment', 'done'].includes(selectedBooking.status) ? "text-yellow-500" : "text-gray-600")}>Payment</span>
+                                    </div>
+
+                                    {/* Step 4: Done */}
+                                    <div className="flex flex-col items-center gap-2">
+                                        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all",
+                                            selectedBooking.status === 'done' ? "bg-white border-white text-black shadow-[0_0_10px_rgba(255,255,255,0.4)]" : "bg-black border-white/20 text-gray-500"
+                                        )}>
+                                            <CheckCircle2 className="w-4 h-4" />
+                                        </div>
+                                        <span className={cn("text-[10px] font-bold uppercase tracking-wider", selectedBooking.status === 'done' ? "text-white" : "text-gray-600")}>Done</span>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="bg-white/5 p-6 rounded-3xl flex justify-between items-center border border-white/5">
-                                <div>
-                                    <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Date & Time</div>
-                                    <div className="text-xl font-black text-white">{selectedBooking.date} / {selectedBooking.time}</div>
+                            {/* DETAILS GRID */}
+                            <div className="grid grid-cols-2 gap-4">
+                                {/* Customer */}
+                                <div className="bg-black/30 p-5 rounded-3xl border border-white/5 space-y-3">
+                                    <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Customer</div>
+                                    <div>
+                                        <div className="text-xl font-bold text-white leading-tight mb-1">{selectedBooking.customerName}</div>
+                                        <div className="text-sm font-mono text-gray-400">{selectedBooking.customerPhone || selectedBooking.phone || "No Phone"}</div>
+                                    </div>
+                                    <a href={`tel:${selectedBooking.customerPhone || selectedBooking.phone}`} className="inline-flex items-center gap-2 text-xs font-bold text-green-500 bg-green-500/10 px-3 py-2 rounded-xl hover:bg-green-500 hover:text-white transition-all w-full justify-center">
+                                        <Phone className="w-3 h-3" /> Call Customer
+                                    </a>
                                 </div>
-                                <div className="text-right">
-                                    <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Price</div>
-                                    <div className="text-2xl font-black text-white">฿{selectedBooking.price}</div>
+
+                                {/* Barber */}
+                                <div className="bg-black/30 p-5 rounded-3xl border border-white/5 space-y-3">
+                                    <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Barber</div>
+                                    <div>
+                                        <div className="text-xl font-bold text-white leading-tight mb-1">{selectedBooking.barberName}</div>
+                                        {/* Commission - Admin Only */}
+                                        <div className="text-xs font-mono text-gray-600 flex justify-between">
+                                            <span>Commission:</span>
+                                            <span className="text-gray-400">฿{selectedBooking.commissionAmount || 0}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* TIMESTAMPS */}
+                            <div className="bg-black/30 p-5 rounded-3xl border border-white/5 space-y-3">
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 border-b border-white/5 pb-2">Timeline Metadata</div>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-gray-500">Scheduled</span>
+                                        <span className="text-white font-mono">{selectedBooking.date} {selectedBooking.time}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-gray-500">Actual Start</span>
+                                        <span className="text-blue-400 font-mono">
+                                            {selectedBooking.stats_actual_start ? new Date(selectedBooking.stats_actual_start.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "-"}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-gray-500">Actual Finish</span>
+                                        <span className="text-green-400 font-mono">
+                                            {selectedBooking.stats_actual_finish ? new Date(selectedBooking.stats_actual_finish.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "-"}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* FINANCIAL BREAKDOWN */}
+                            <div className="bg-white/5 p-6 rounded-3xl border border-white/5 space-y-4">
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Base Price</span>
+                                        <span className="text-sm font-mono text-gray-300">฿{selectedBooking.price}</span>
+                                    </div>
+                                    {(selectedBooking.extra_fee || 0) > 0 && (
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs font-bold text-yellow-500 uppercase tracking-wider">Extra Fee</span>
+                                            <span className="text-sm font-mono text-yellow-500">+฿{selectedBooking.extra_fee}</span>
+                                        </div>
+                                    )}
+                                    {(selectedBooking.discount || 0) > 0 && (
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs font-bold text-red-500 uppercase tracking-wider">Discount</span>
+                                            <span className="text-sm font-mono text-red-500">-฿{selectedBooking.discount}</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="h-px bg-white/10" />
+                                <div className="flex justify-between items-end">
+                                    <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Total Amount</span>
+                                    <span className="text-3xl font-black text-white font-inter tracking-tight">
+                                        ฿{(selectedBooking.final_price || ((selectedBooking.price || 0) + (selectedBooking.extra_fee || 0) - (selectedBooking.discount || 0))).toLocaleString()}
+                                    </span>
                                 </div>
                             </div>
 
@@ -483,17 +657,19 @@ export default function AdminBookingsPage() {
                                 </div>
                             )}
 
+                            {/* ACTIONS */}
                             <div className="grid grid-cols-2 gap-3 pt-2">
                                 {selectedBooking.status === 'pending' && (
                                     <>
-                                        <button onClick={() => updateStatus('confirmed')} className="bg-white text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-gray-200 transition-all shadow-lg shadow-white/10">Approve Booking</button>
+                                        <button onClick={() => updateStatus('confirmed')} className="bg-white text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-gray-200 transition-all shadow-lg shadow-white/10">Approve</button>
                                         <button onClick={() => updateStatus('rejected')} className="bg-red-500/10 text-red-500 py-4 rounded-2xl font-black uppercase tracking-widest border border-red-500/20 hover:bg-red-500/20 transition-all">Reject</button>
                                     </>
                                 )}
+                                {/* For confirmed, we typically rely on the dashboard for flow, but Admin can force complete if needed */}
                                 {selectedBooking.status === 'confirmed' && (
                                     <>
-                                        <button onClick={() => updateStatus('done')} className="bg-green-500 text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-green-600 transition-all shadow-lg shadow-green-500/20">Complete Job</button>
-                                        <button onClick={() => updateStatus('cancelled')} className="bg-red-500/10 text-red-500 py-4 rounded-2xl font-black uppercase tracking-widest border border-red-500/20 hover:bg-red-500/20 transition-all">Cancel Booking</button>
+                                        <button disabled className="bg-gray-800 text-gray-500 py-4 rounded-2xl font-black uppercase tracking-widest cursor-not-allowed">Waiting Start</button>
+                                        <button onClick={() => updateStatus('cancelled')} className="bg-red-500/10 text-red-500 py-4 rounded-2xl font-black uppercase tracking-widest border border-red-500/20 hover:bg-red-500/20 transition-all">Cancel</button>
                                     </>
                                 )}
                             </div>

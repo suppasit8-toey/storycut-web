@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { formatDateDDMMYYYY, parseDDMMYYYY } from "@/utils/dateUtils";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2, Camera, Image as ImageIcon, QrCode } from "lucide-react";
+import { CldUploadWidget } from 'next-cloudinary';
 
 export default function BranchDetailPage() {
     const { slug } = useParams();
@@ -25,6 +26,12 @@ export default function BranchDetailPage() {
         bankName: "",
         accountNumber: "",
         accountName: "",
+        // Logos
+        logoSquareUrl: "",
+        logoHorizontalBlackUrl: "",
+        logoHorizontalWhiteUrl: "",
+        // QR
+        paymentQrUrl: "",
     });
 
     const [holidays, setHolidays] = useState<{ date: string }[]>([]);
@@ -52,6 +59,10 @@ export default function BranchDetailPage() {
                     bankName: data.bankName || "",
                     accountNumber: data.accountNumber || "",
                     accountName: data.accountName || "",
+                    logoSquareUrl: data.logoSquareUrl || "",
+                    logoHorizontalBlackUrl: data.logoHorizontalBlackUrl || "",
+                    logoHorizontalWhiteUrl: data.logoHorizontalWhiteUrl || "",
+                    paymentQrUrl: data.paymentQrUrl || "",
                 });
                 setHolidays(data.holidays || []);
             } else {
@@ -166,6 +177,7 @@ export default function BranchDetailPage() {
                                     className="w-full bg-black border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-white/40 transition-all"
                                 />
                             </div>
+
                             <div className="md:col-span-2">
                                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Location Link (Google Maps)</label>
                                 <input
@@ -224,6 +236,102 @@ export default function BranchDetailPage() {
                         </div>
                     </section>
 
+                    {/* Section: Brand Assets */}
+                    <section className="bg-[#1A1A1A] rounded-[32px] p-8 border border-white/5 shadow-2xl">
+                        <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
+                            <span className="w-3 h-3 rounded-full bg-white shadow-[0_0_10px_white]"></span>
+                            Brand Assets
+                        </h2>
+                        <div className="space-y-4">
+                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Logos</label>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {/* 1:1 Square Logo */}
+                                <div className="flex flex-col gap-2 items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase">Logo 1:1 (Square)</span>
+                                    <CldUploadWidget
+                                        uploadPreset="storycut_uploads"
+                                        onSuccess={(result: any) => {
+                                            if (result.info?.secure_url) {
+                                                setFormData(prev => ({ ...prev, logoSquareUrl: result.info.secure_url }));
+                                            }
+                                        }}
+                                    >
+                                        {({ open }) => (
+                                            <div
+                                                onClick={() => open()}
+                                                className="cursor-pointer group relative w-32 h-32 rounded-[32px] overflow-hidden border-2 border-dashed border-white/10 hover:border-white/40 transition-all bg-black"
+                                            >
+                                                {formData.logoSquareUrl ? (
+                                                    <img src={formData.logoSquareUrl} className="w-full h-full object-cover" alt="Square Logo" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-gray-600 group-hover:text-gray-400">
+                                                        <ImageIcon className="w-8 h-8" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </CldUploadWidget>
+                                </div>
+
+                                {/* 10:3 Black Text */}
+                                <div className="flex flex-col gap-2 items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase">Horizontal (Black Text)</span>
+                                    <CldUploadWidget
+                                        uploadPreset="storycut_uploads"
+                                        onSuccess={(result: any) => {
+                                            if (result.info?.secure_url) {
+                                                setFormData(prev => ({ ...prev, logoHorizontalBlackUrl: result.info.secure_url }));
+                                            }
+                                        }}
+                                    >
+                                        {({ open }) => (
+                                            <div
+                                                onClick={() => open()}
+                                                className="cursor-pointer group relative w-full h-32 md:w-48 md:h-24 rounded-[32px] overflow-hidden border-2 border-dashed border-white/10 hover:border-white/40 transition-all bg-white"
+                                            >
+                                                {formData.logoHorizontalBlackUrl ? (
+                                                    <img src={formData.logoHorizontalBlackUrl} className="w-full h-full object-contain p-2" alt="Black Text Logo" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-gray-300 group-hover:text-gray-400">
+                                                        <ImageIcon className="w-8 h-8" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </CldUploadWidget>
+                                </div>
+
+                                {/* 10:3 White Text */}
+                                <div className="flex flex-col gap-2 items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase">Horizontal (White Text)</span>
+                                    <CldUploadWidget
+                                        uploadPreset="storycut_uploads"
+                                        onSuccess={(result: any) => {
+                                            if (result.info?.secure_url) {
+                                                setFormData(prev => ({ ...prev, logoHorizontalWhiteUrl: result.info.secure_url }));
+                                            }
+                                        }}
+                                    >
+                                        {({ open }) => (
+                                            <div
+                                                onClick={() => open()}
+                                                className="cursor-pointer group relative w-full h-32 md:w-48 md:h-24 rounded-[32px] overflow-hidden border-2 border-dashed border-white/10 hover:border-white/40 transition-all bg-black"
+                                            >
+                                                {formData.logoHorizontalWhiteUrl ? (
+                                                    <img src={formData.logoHorizontalWhiteUrl} className="w-full h-full object-contain p-2" alt="White Text Logo" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-gray-600 group-hover:text-gray-400">
+                                                        <ImageIcon className="w-8 h-8" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </CldUploadWidget>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
                     {/* Section 2: Financial Config */}
                     <section className="bg-[#1A1A1A] rounded-[32px] p-8 border border-white/5 shadow-2xl">
                         <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
@@ -261,6 +369,42 @@ export default function BranchDetailPage() {
                                     onChange={handleChange}
                                     className="w-full bg-black border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-white/40 transition-all"
                                 />
+                            </div>
+                        </div>
+
+                        <div className="mt-8 pt-8 border-t border-white/5">
+                            <h3 className="text-xs font-bold text-gray-500 mb-4 uppercase tracking-widest">Payment Methods</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                                <div>
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-4">Bank Transfer QR Code</label>
+                                    <CldUploadWidget
+                                        uploadPreset="storycut_uploads"
+                                        onSuccess={(result: any) => {
+                                            if (result.info?.secure_url) {
+                                                setFormData(prev => ({ ...prev, paymentQrUrl: result.info.secure_url }));
+                                            }
+                                        }}
+                                    >
+                                        {({ open }) => (
+                                            <div
+                                                onClick={() => open()}
+                                                className="cursor-pointer group relative w-48 h-48 rounded-[32px] overflow-hidden border-2 border-dashed border-white/10 hover:border-white/40 transition-all bg-black mx-auto md:mx-0"
+                                            >
+                                                {formData.paymentQrUrl ? (
+                                                    <img src={formData.paymentQrUrl} className="w-full h-full object-cover" alt="Payment QR" />
+                                                ) : (
+                                                    <div className="w-full h-full flex flex-col items-center justify-center text-gray-600 group-hover:text-gray-400 gap-2">
+                                                        <QrCode className="w-8 h-8" />
+                                                        <span className="text-[10px] uppercase font-bold">Upload QR</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </CldUploadWidget>
+                                    <p className="mt-2 text-[10px] text-gray-600 uppercase text-center md:text-left">
+                                        Displayed during checkout
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </section>

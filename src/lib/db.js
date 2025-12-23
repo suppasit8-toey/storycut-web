@@ -97,6 +97,22 @@ export const getBookingsByBarberAndDate = async (barberId, date) => {
         throw e;
     }
 };
+
+export const getBookingByCustomId = async (bookingId) => {
+    try {
+        const q = query(collection(db, "bookings"), where("bookingId", "==", bookingId));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+            const doc = querySnapshot.docs[0];
+            return { id: doc.id, ...doc.data() };
+        }
+        return null;
+    } catch (e) {
+        console.error("Error getting booking by custom ID: ", e);
+        throw e;
+    }
+};
+
 export const updateBookingStatus = async (bookingId, status) => {
     try {
         const docRef = doc(db, "bookings", bookingId);
@@ -221,6 +237,48 @@ export const updateBarberService = async (barberId, serviceId, data) => {
         console.log("Barber service mapping updated");
     } catch (e) {
         console.error("Error updating barber service mapping: ", e);
+        throw e;
+    }
+};
+
+export const updateCustomerPoints = async (phone, pointsToAdd, name) => {
+    try {
+        if (!phone) return;
+
+        // Use phone number as document ID for easy lookup
+        const docRef = doc(db, "customers", phone);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+            await updateDoc(docRef, {
+                totalPoints: (docSnap.data().totalPoints || 0) + pointsToAdd,
+                lastVisit: new Date(),
+                visitCount: (docSnap.data().visitCount || 0) + 1,
+                name: name || docSnap.data().name // Update name if provided
+            });
+        } else {
+            await setDoc(docRef, {
+                phone: phone,
+                name: name || "Unknown",
+                totalPoints: pointsToAdd,
+                visitCount: 1,
+                lastVisit: new Date(),
+                createdAt: new Date()
+            });
+        }
+        console.log("Customer points updated");
+    } catch (e) {
+        console.error("Error updating customer points: ", e);
+        throw e;
+    }
+};
+
+export const getBranches = async () => {
+    try {
+        const querySnapshot = await getDocs(collection(db, "branches"));
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (e) {
+        console.error("Error getting branches: ", e);
         throw e;
     }
 };

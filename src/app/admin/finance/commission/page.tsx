@@ -13,9 +13,12 @@ function cn(...inputs: ClassValue[]) {
 
 interface Booking {
     id: string;
+    bookingId?: string;
     barberId: string;
     barberName: string;
     price: number;
+    extra_fee?: number;
+    discount?: number;
     status: string;
     date: string; // DD/MM/YYYY
     serviceId?: string;
@@ -96,7 +99,7 @@ export default function CommissionPage() {
             totalCommission: number;
             totalPaid: number;
             avatar: string;
-            jobs: Array<Booking & { commission: number }>; // Store processed jobs
+            jobs: Array<Booking & { commission: number; finalRevenue?: number }>; // Store processed jobs
         }>();
 
         const configMap = new Map<string, number>();
@@ -150,14 +153,23 @@ export default function CommissionPage() {
                 commission = configMap.get(key) || 0;
             }
 
+            // REVENUE CALCULATION: Price + Extra - Discount
+            // Check key 'extra_fee' or 'extraFee' depending on database schema. 
+            // Previous code used 'extra_fee' in interface but in other files it might be 'extraFee'.
+            // Let's safe check both if unsure, but user request said 'extra_fee'. 
+            // In Booking interface I added 'extra_fee', but let's check legacy 'extraFee' just in case.
+            const revenue = (Number(b.price) || 0) + (Number(b.extra_fee) || 0) - (Number(b.discount) || 0);
+
             s.bookingCount += 1;
-            s.totalEarning += (Number(b.price) || 0);
+            s.totalEarning += revenue;
             s.totalCommission += commission;
 
             s.jobs.push({
                 ...b,
-                commission
+                commission,
+                finalRevenue: revenue
             });
+
         });
 
         // 2. Process Payments
@@ -200,6 +212,20 @@ export default function CommissionPage() {
                 monthKey,
                 note: "Partial Payout"
             });
+
+            // AUTOMATED EXPENSE LOGGING
+            const barberName = activeBarberData?.name || "Unknown Barber";
+            const monthName = new Date(selectedYear, Number(selectedMonth) - 1).toLocaleString('default', { month: 'long' });
+
+            await addDoc(collection(db, "transactions"), {
+                type: 'expense',
+                amount: parseFloat(payAmount),
+                description: `Commission - ${monthName} ${selectedYear} - ${barberName}`,
+                category: 'Staff Commission',
+                date: serverTimestamp(),
+                createdAt: serverTimestamp()
+            });
+
             setShowPayModal(false);
             setPayAmount("");
         } catch (err) {
@@ -365,7 +391,8 @@ export default function CommissionPage() {
                                         <table className="w-full text-left text-sm">
                                             <thead>
                                                 <tr className="bg-white/5 border-b border-white/5">
-                                                    <th className="p-4 pl-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Date/Time</th>
+                                                    <th className="p-4 pl-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Booking ID</th>
+                                                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Date/Time</th>
                                                     <th className="p-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Customer</th>
                                                     <th className="p-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Service</th>
                                                     <th className="p-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Revenue</th>
@@ -373,18 +400,24 @@ export default function CommissionPage() {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-white/5">
-                                                {activeBarberData.jobs.sort((a, b) => b.id.localeCompare(a.id)).map((job) => (
-                                                    <tr key={job.id} className="hover:bg-white/5 transition-colors">
-                                                        <td className="p-4 pl-6 font-bold text-gray-300">
-                                                            {job.date}
-                                                            {job.startTime && <span className="block text-[10px] text-gray-500 font-medium">{job.startTime}</span>}
-                                                        </td>
-                                                        <td className="p-4 font-medium text-gray-400">{job.customerName || "-"}</td>
-                                                        <td className="p-4 font-medium text-gray-400">{job.serviceName || "Standard Service"}</td>
-                                                        <td className="p-4 text-right font-bold text-gray-300">฿{job.price.toLocaleString()}</td>
-                                                        <td className="p-4 pr-6 text-right font-black italic text-amber-500">฿{job.commission.toLocaleString()}</td>
-                                                    </tr>
-                                                ))}
+                                                {activeBarberData.jobs.sort((a, b) => b.id.localeCompare(a.id)).map((job) => {
+                                                    const finalRev = job.finalRevenue ?? job.price;
+                                                    return (
+                                                        <tr key={job.id} className="hover:bg-white/5 transition-colors">
+                                                            <td className="p-4 pl-6 font-mono text-xs font-bold text-gray-400">
+                                                                #{job.bookingId || job.id.slice(0, 6).toUpperCase()}
+                                                            </td>
+                                                            <td className="p-4 font-bold text-gray-300">
+                                                                {job.date}
+                                                                {job.startTime && <span className="block text-[10px] text-gray-500 font-medium">{job.startTime}</span>}
+                                                            </td>
+                                                            <td className="p-4 font-medium text-gray-400">{job.customerName || "-"}</td>
+                                                            <td className="p-4 font-medium text-gray-400">{job.serviceName || "Standard Service"}</td>
+                                                            <td className="p-4 text-right font-bold text-gray-300">฿{finalRev.toLocaleString()}</td>
+                                                            <td className="p-4 pr-6 text-right font-black italic text-amber-500">฿{job.commission.toLocaleString()}</td>
+                                                        </tr>
+                                                    );
+                                                })}
                                                 {activeBarberData.jobs.length === 0 && (
                                                     <tr>
                                                         <td colSpan={5} className="p-8 text-center text-gray-500 font-bold uppercase tracking-widest text-xs">No jobs found</td>
@@ -394,7 +427,7 @@ export default function CommissionPage() {
                                             {/* Summary Row */}
                                             <tfoot className="bg-white/5 border-t border-white/5">
                                                 <tr>
-                                                    <td colSpan={3} className="p-4 pl-6 text-xs font-black uppercase tracking-widest text-right text-gray-400">Totals</td>
+                                                    <td colSpan={4} className="p-4 pl-6 text-xs font-black uppercase tracking-widest text-right text-gray-400">Totals</td>
                                                     <td className="p-4 text-right font-black text-white">฿{activeBarberData.totalEarning.toLocaleString()}</td>
                                                     <td className="p-4 pr-6 text-right font-black italic text-amber-500 text-lg">฿{activeBarberData.totalCommission.toLocaleString()}</td>
                                                 </tr>

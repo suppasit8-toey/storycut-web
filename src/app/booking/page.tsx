@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, addDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { generateBookingId } from "@/utils/bookingUtils";
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -25,6 +26,20 @@ const formatDate = (date: Date): string => {
 
 // --- Types ---
 // --- Types ---
+type Branch = {
+    id: string;
+    name: string;
+    locationLink?: string;
+    image?: string;
+    logoSquareUrl?: string;
+    logoHorizontalWhiteUrl?: string; // New: Brand Asset
+    address?: string;
+};
+
+// ... (Rest of Types omitted for brevity if unchanged, assuming tools handle context) ...
+
+
+
 type Service = {
     id: string;
     name: string;
@@ -32,13 +47,17 @@ type Service = {
     price: number; // Base Price
     price_promo?: number; // Global Promo (optional)
     duration?: number;
+    deposit?: number;
+    branchId?: string; // Optional: for filtering
 };
 
 type Barber = {
     id: string;
     name: string;
+    name_en?: string; // Explicit English Name
     role: string;
     nickname: string;
+    branchId?: string; // Optional: for filtering
 };
 
 type BarberServiceMapping = {
@@ -52,6 +71,7 @@ type BarberServiceMapping = {
 };
 
 interface BookingState {
+    branch: Branch | null; // NEW: Branch Selection
     service: Service | null;
     barber: Barber | null;
     date: Date | null;
@@ -93,10 +113,11 @@ const formatPrice = (price?: number) => {
 };
 export default function BookingPage() {
     const router = useRouter();
-    const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+    const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1); // 5 Steps now
     const [isLoading, setIsLoading] = useState(true);
 
     // Data State
+    const [branches, setBranches] = useState<Branch[]>([]); // NEW
     const [services, setServices] = useState<Service[]>([]);
     const [barbers, setBarbers] = useState<Barber[]>([]);
     const [barberServices, setBarberServices] = useState<BarberServiceMapping[]>([]); // New State for Mappings
@@ -104,6 +125,7 @@ export default function BookingPage() {
 
     // Booking State
     const [booking, setBooking] = useState<BookingState>({
+        branch: null, // Init
         service: null,
         barber: null,
         date: null,
@@ -116,6 +138,10 @@ export default function BookingPage() {
     // --- Data Fetching ---
     useEffect(() => {
         // Use onSnapshot for Real-time updates as requested
+        const unsubBranches = onSnapshot(collection(db, "branches"), (snap) => {
+            setBranches(snap.docs.map(d => ({ id: d.id, ...d.data() } as Branch)));
+        });
+
         const unsubServices = onSnapshot(collection(db, "services"), (snap) => {
             setServices(snap.docs.map(d => ({ id: d.id, ...d.data() } as Service)));
         });
@@ -131,6 +157,7 @@ export default function BookingPage() {
         });
 
         return () => {
+            unsubBranches();
             unsubServices();
             unsubBarbers();
             unsubMappings();
@@ -190,7 +217,7 @@ export default function BookingPage() {
 
     // --- Availability Logic ---
     useEffect(() => {
-        if (!booking.date || !booking.barber || step !== 3) return;
+        if (!booking.date || !booking.barber || step !== 4) return;
 
         setIsLoading(true);
         const dateStr = formatDate(booking.date);
@@ -263,23 +290,31 @@ export default function BookingPage() {
 
     // --- Handlers ---
     const handleNext = () => {
-        if (step < 4) setStep((s) => (s + 1) as any);
+        if (step < 5) setStep((s) => (s + 1) as any);
     };
 
     const handleConfirm = async () => {
-        if (!booking.service || !booking.barber || !booking.date || !booking.time) return;
+        if (!booking.service || !booking.barber || !booking.date || !booking.time || !booking.branch) return;
 
         setSubmitStatus('loading');
 
         const finalPrice = getFinalPrice();
 
         try {
+            // Generate unique booking ID
+            const bookingId = await generateBookingId();
+
             const bookingData = {
+                bookingId,
+                bookingType: "online",
+                branchId: booking.branch.id, // SAVE BRANCH
+                branchName: booking.branch.name,
                 serviceId: booking.service.id,
                 serviceName: booking.service.name,
-                price: finalPrice, // Use FINAL calculated price
+                price: finalPrice,
                 barberId: booking.barber.id,
-                barberName: booking.barber.name,
+                barberName: booking.barber.nickname || booking.barber.name_en || booking.barber.name, // Enforce English
+                depositAmount: booking.service.deposit || 0,
                 date: formatDate(booking.date),
                 time: booking.time,
                 customerName: booking.customer.name,
@@ -309,10 +344,11 @@ export default function BookingPage() {
 
     // --- Computed ---
     const isStepValid = () => {
-        if (step === 1) return !!booking.service;
-        if (step === 2) return !!booking.barber;
-        if (step === 3) return !!booking.date && !!booking.time;
-        if (step === 4) return !!booking.customer.name && !!booking.customer.phone;
+        if (step === 1) return !!booking.branch;
+        if (step === 2) return !!booking.service;
+        if (step === 3) return !!booking.barber;
+        if (step === 4) return !!booking.date && !!booking.time;
+        if (step === 5) return !!booking.customer.name && !!booking.customer.phone;
         return false;
     };
 
@@ -332,19 +368,45 @@ export default function BookingPage() {
 
     // --- UI Components ---
 
-    const Header = () => (
-        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-50 flex-none bg-white z-20">
-            <div className="font-bold text-xl uppercase tracking-tighter">StoryCut</div>
-            <Link href="/booking/status">
-                <button className="text-xs font-medium border border-gray-200 rounded-full px-4 py-1.5 hover:bg-gray-50 transition-colors">
-                    เช็คสถานะ
-                </button>
-            </Link>
-        </div>
-    );
+    const Header = () => {
+        // Logic: 
+        // 1. If branch selected (Step > 1), use its logo
+        // 2. If not selected (Step 1), try to find ANY branch with a logo (prefer 'Headquarters' if we had that flag, but for now just first valid)
+        // 3. Fallback to Text
+        const branchLogo = booking.branch?.logoHorizontalWhiteUrl;
+        const defaultLogo = branches.find(b => b.logoHorizontalWhiteUrl)?.logoHorizontalWhiteUrl;
+        const displayLogo = branchLogo || defaultLogo;
+
+        return (
+            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-50 flex-none bg-white z-20">
+                <div className="flex items-center">
+                    {displayLogo ? (
+                        <div className="h-8 md:h-10 relative aspect-[10/3]">
+                            {/* Asset: "Horizontal (White Text)" meant for Dark Backgrounds. 
+                                  Header: White BG. 
+                                  Action: Invert filter to make it black. 
+                              */}
+                            <img
+                                src={displayLogo}
+                                alt="StoryCut"
+                                className="h-full w-auto object-contain filter invert"
+                            />
+                        </div>
+                    ) : (
+                        <div className="font-bold text-xl uppercase tracking-tighter">StoryCut</div>
+                    )}
+                </div>
+                <Link href="/booking/status">
+                    <button className="text-xs font-medium border border-gray-200 rounded-full px-4 py-1.5 hover:bg-gray-50 transition-colors">
+                        เช็คสถานะ
+                    </button>
+                </Link>
+            </div>
+        );
+    };
 
     const ProgressBar = () => {
-        const steps = ["บริการ", "ช่าง", "วันเวลา", "ยืนยัน"];
+        const steps = ["สาขา", "บริการ", "ช่าง", "วันเวลา", "ยืนยัน"];
         return (
             <div className="bg-white pt-2 pb-4 px-6 sticky top-0 z-10 border-b border-gray-50 flex-none">
                 <div className="flex justify-between mb-2">
@@ -360,19 +422,65 @@ export default function BookingPage() {
                 <div className="h-1 w-full bg-gray-100 rounded-full overflow-hidden">
                     <div
                         className="h-full bg-black transition-all duration-500 ease-out"
-                        style={{ width: `${(step / 4) * 100}%` }}
+                        style={{ width: `${(step / 5) * 100}%` }}
                     />
                 </div>
             </div>
         );
     };
 
-    // Step 1: Select Service
+    // Step 1: Select Branch
+    const StepBranch = () => (
+        <div className="p-6 space-y-4 animate-in fade-in slide-in-from-right-8 duration-500">
+            <h2 className="text-2xl font-bold mb-6">เลือกสาขา</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {branches.map((branch) => (
+                    <div
+                        key={branch.id}
+                        onClick={() => {
+                            setBooking(b => ({ ...b, branch }));
+                            setTimeout(() => setStep(2), 150);
+                        }}
+                        className={cn(
+                            "group cursor-pointer rounded-[32px] overflow-hidden border transition-all relative active:scale-[0.98]",
+                            booking.branch?.id === branch.id
+                                ? "border-black ring-1 ring-black/5"
+                                : "border-gray-200 hover:border-gray-400 shadow-sm"
+                        )}
+                    >
+                        {/* Image/Bg */}
+                        <div className="h-32 bg-gray-100 relative">
+                            {branch.logoSquareUrl ? (
+                                <img src={branch.logoSquareUrl} alt={branch.name} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-[#1A1A1A] text-white/20">
+                                    <span className="font-bold text-2xl uppercase italic">No Image</span>
+                                </div>
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+
+                            {/* Content Overlay */}
+                            <div className="absolute bottom-0 left-0 p-6 text-white w-full">
+                                <h3 className="font-bold text-xl leading-none mb-1">{branch.name}</h3>
+                                {branch.address && <p className="text-white/60 text-xs font-light truncate">{branch.address}</p>}
+                            </div>
+                        </div>
+                    </div>
+                ))}
+
+                {branches.length === 0 && !isLoading && (
+                    <div className="text-center text-gray-400 py-10 col-span-full">ไม่พบข้อมูลสาขา</div>
+                )}
+            </div>
+        </div>
+    );
+
+    // Step 2: Select Service
     const StepService = () => (
         <div className="p-6 space-y-4 animate-in fade-in slide-in-from-right-8 duration-500">
             <h2 className="text-2xl font-bold mb-6">เลือกบริการ</h2>
             <div className="flex flex-col gap-3">
-                {services.map((service) => {
+                {services.filter(s => !s.branchId || !booking.branch || s.branchId === booking.branch.id).map((service) => {
                     const priceInfo = getLowestPrice(service.id, service.price);
 
                     return (
@@ -380,7 +488,7 @@ export default function BookingPage() {
                             key={service.id}
                             onClick={() => {
                                 setBooking(b => ({ ...b, service }));
-                                setTimeout(() => setStep(2), 150);
+                                setTimeout(() => setStep(3), 150);
                             }}
                             className={cn(
                                 "group flex items-center justify-between p-5 rounded-2xl border transition-all cursor-pointer active:scale-[0.98]",
@@ -422,12 +530,12 @@ export default function BookingPage() {
         </div>
     );
 
-    // Step 2: Select Barber
+    // Step 3: Select Barber
     const StepBarber = () => (
         <div className="p-6 space-y-4 animate-in fade-in slide-in-from-right-8 duration-500">
             <h2 className="text-2xl font-bold mb-6">เลือกช่าง</h2>
             <div className="grid grid-cols-1 gap-3">
-                {barbers.map((barber) => {
+                {barbers.filter(b => !b.branchId || !booking.branch || b.branchId === booking.branch.id).map((barber) => {
                     // Check if barber can perform this service
                     // AND display specific price for this barber
                     const mapping = barberServices.find(m => m.barber_id === barber.id && m.service_id === booking.service?.id);
@@ -442,7 +550,7 @@ export default function BookingPage() {
                             key={barber.id}
                             onClick={() => {
                                 setBooking(b => ({ ...b, barber }));
-                                setTimeout(() => setStep(3), 150);
+                                setTimeout(() => setStep(4), 150);
                             }}
                             className={cn(
                                 "flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer active:scale-[0.98]",
@@ -565,7 +673,7 @@ export default function BookingPage() {
         );
     };
 
-    // Step 4: Contact & Payment
+    // Step 5: Contact & Payment
     const StepSummary = () => {
         const finalPrice = getFinalPrice();
         const [isMounted, setIsMounted] = useState(false);
@@ -596,59 +704,59 @@ export default function BookingPage() {
                             value={booking.customer.phone}
                             onChange={e => setBooking(b => ({ ...b, customer: { ...b.customer, phone: e.target.value } }))}
                             className="w-full p-4 rounded-xl bg-gray-50 border-none font-medium text-black placeholder:text-gray-400 focus:ring-2 focus:ring-black transition-all outline-none"
-                            placeholder="08x-xxx-xxxx"
+                            placeholder="08xxxxxxxx"
                         />
                     </div>
                 </div>
 
-                {/* Summary Box */}
-                <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-3">
-                    <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-900 font-medium">บริการ</span>
-                        <span className="font-bold">{booking.service?.name}</span>
+                {/* Summary Card */}
+                <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 space-y-4">
+                    <div className="flex justify-between items-start">
+                        <div className="text-sm font-bold text-gray-500">สาขา</div>
+                        <div className="text-right font-medium">{booking.branch?.name}</div>
                     </div>
-                    <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-900 font-medium">ช่าง</span>
-                        <span className="font-bold">{booking.barber?.nickname || booking.barber?.name}</span>
+                    <div className="flex justify-between items-start">
+                        <div className="text-sm font-bold text-gray-500">บริการ</div>
+                        <div className="text-right font-medium">{booking.service?.name}</div>
                     </div>
-                    <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-900 font-medium">วันเวลา</span>
-                        <span className="font-bold text-black">{formatSelectedDate(booking.date)} / {booking.time}</span>
+                    <div className="flex justify-between items-start">
+                        <div className="text-sm font-bold text-gray-500">ช่าง</div>
+                        <div className="text-right font-medium">{booking.barber?.nickname || booking.barber?.name}</div>
                     </div>
-                    <div className="h-px bg-gray-100 my-2" />
-                    <div className="flex justify-between items-center">
-                        <span className="text-gray-900 font-medium">ยอดรวม</span>
-                        <span className="font-bold text-xl">{formatPrice(finalPrice)}</span>
+                    <div className="flex justify-between items-start">
+                        <div className="text-sm font-bold text-gray-500">วันเวลา</div>
+                        <div className="text-right font-medium">{formatSelectedDate(booking.date)} - {booking.time} น.</div>
+                    </div>
+                    <div className="flex justify-between items-start border-t border-gray-200 pt-3 mt-2">
+                        <div className="text-sm font-bold text-gray-500">ค่ามัดจำ (Deposit)</div>
+                        <div className="text-right font-bold text-green-600">
+                            {formatPrice(booking.service?.deposit || 0)}
+                        </div>
+                    </div>
+                    <div className="flex justify-between items-start border-t border-gray-200 pt-3 mt-2">
+                        <div className="text-base font-bold text-gray-900">ราคาโดยประมาณ</div>
+                        <div className="text-right font-black text-xl">{formatPrice(finalPrice)}</div>
                     </div>
                 </div>
 
-                {/* Payment Blue Box */}
-                <div className="bg-blue-600 rounded-2xl p-5 text-white shadow-lg shadow-blue-200 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10" />
-
-                    <div className="relative z-10">
-                        <div className="text-blue-100 text-sm mb-1">มัดจำการจอง</div>
-                        <div className="text-3xl font-bold mb-4">150 ฿</div>
-
-                        <div className="flex items-center gap-3 mb-6 bg-blue-500/30 p-3 rounded-xl backdrop-blur-sm border border-white/10">
-                            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-green-600 font-bold text-xs shrink-0">
-                                KB
-                            </div>
-                            <div>
-                                <div className="text-xs text-blue-100">ธนาคารกสิกรไทย</div>
-                                <div className="font-bold tracking-wide">012-3-45678-9</div>
-                            </div>
+                {/* Submit Button */}
+                <button
+                    onClick={handleConfirm}
+                    disabled={!isStepValid() || submitStatus === 'loading'}
+                    className={cn(
+                        "w-full py-4 rounded-xl font-bold text-lg transition-all shadow-xl",
+                        isStepValid()
+                            ? "bg-black text-white hover:bg-gray-900 hover:scale-[1.02] active:scale-[0.98]"
+                            : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    )}
+                >
+                    {submitStatus === 'loading' ? (
+                        <div className="flex items-center justify-center gap-2">
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            กำลังยืนยัน...
                         </div>
-
-                        <button className="w-full bg-white/10 hover:bg-white/20 transition-colors border-2 border-dashed border-white/30 rounded-xl py-3 flex items-center justify-center gap-2 text-sm font-medium">
-                            <Upload className="w-4 h-4" />
-                            แนบสลิปโอนเงิน (จำลอง)
-                        </button>
-                        <div className="text-[10px] text-blue-200 mt-2 text-center opacity-70">
-                            * ในเวอร์ชั่น Demo นี้ ไม่จำเป็นต้องแนบสลิปจริง
-                        </div>
-                    </div>
-                </div>
+                    ) : "ยืนยันการจอง"}
+                </button>
             </div>
         );
     };
@@ -674,16 +782,17 @@ export default function BookingPage() {
             <ProgressBar />
 
             <div className="flex-1 overflow-y-auto bg-white scroll-smooth pb-0">
-                {step === 1 && <StepService />}
-                {step === 2 && <StepBarber />}
-                {step === 3 && <StepDateTime />}
-                {step === 4 && <StepSummary />}
+                {step === 1 && <StepBranch />}
+                {step === 2 && <StepService />}
+                {step === 3 && <StepBarber />}
+                {step === 4 && <StepDateTime />}
+                {step === 5 && <StepSummary />}
             </div>
 
             {/* Footer / Bottom Nav */}
             <div className="p-4 border-t border-gray-50 bg-white flex-none pb-8 md:pb-4 shadow-[0_-5px_20px_rgba(0,0,0,0.02)] z-20">
                 {/* Summary text above button if not last step */}
-                {step < 4 && step > 1 && (
+                {step < 5 && step > 1 && (
                     <div className="flex justify-between items-center mb-4 px-2">
                         <div className="text-xs font-semibold text-gray-500">
                             {booking.service?.name} {booking.service?.price && `• ${formatPrice(getFinalPrice() || booking.service.price)}`}
@@ -693,7 +802,7 @@ export default function BookingPage() {
 
                 <button
                     disabled={!isStepValid() || submitStatus === 'loading'}
-                    onClick={step === 4 ? handleConfirm : handleNext}
+                    onClick={step === 5 ? handleConfirm : handleNext}
                     className={cn(
                         "w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all",
                         isStepValid() && submitStatus !== 'loading'
@@ -708,8 +817,8 @@ export default function BookingPage() {
                         </>
                     ) : (
                         <>
-                            {step === 4 ? "ยืนยันการจอง" : "ถัดไป"}
-                            {step < 4 && <ChevronRight className="w-4 h-4" />}
+                            {step === 5 ? "ยืนยันการจอง" : "ถัดไป"}
+                            {step < 5 && <ChevronRight className="w-4 h-4" />}
                         </>
                     )}
                 </button>
