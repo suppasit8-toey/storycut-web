@@ -61,12 +61,24 @@ export const getBarberById = async (id) => {
 
 export const addBooking = async (bookingData) => {
     try {
-        const docRef = await addDoc(collection(db, "bookings"), {
-            ...bookingData,
-            createdAt: new Date()
-        });
-        console.log("Booking written with ID: ", docRef.id);
-        return docRef.id;
+        if (bookingData.id) {
+            // Use setDoc with the provided custom ID (e.g. 6-char bookingId)
+            const docRef = doc(db, "bookings", bookingData.id);
+            await setDoc(docRef, {
+                ...bookingData,
+                createdAt: new Date()
+            });
+            console.log("Booking written with Custom ID: ", bookingData.id);
+            return bookingData.id;
+        } else {
+            // Fallback to auto-generated ID if no ID provided
+            const docRef = await addDoc(collection(db, "bookings"), {
+                ...bookingData,
+                createdAt: new Date()
+            });
+            console.log("Booking written with Auto ID: ", docRef.id);
+            return docRef.id;
+        }
     } catch (e) {
         console.error("Error adding booking: ", e);
         throw e;

@@ -359,8 +359,8 @@ export default function BookingPage() {
             const dateTimeString = `${dateStr} ${selectedTime}`;
             const finalPrice = selectedBarber ? (barberPricingMap[selectedBarber.id]?.price_promo || barberPricingMap[selectedBarber.id]?.price_normal || selectedService.price_promo || selectedService.base_price) : (selectedService.price_promo || selectedService.base_price);
 
-            // Generate 6-char Booking ID (e.g., #7X91KZ)
-            const bookingId = "#" + Math.random().toString(36).substring(2, 8).toUpperCase();
+            // Generate 6-char Booking ID (e.g., 7X91KZ)
+            const bookingId = Math.random().toString(36).substring(2, 8).toUpperCase();
 
             await addBooking({
                 id: bookingId, // explicitly pass the custom ID if addBooking supports it, or just bookingId field
@@ -413,7 +413,7 @@ export default function BookingPage() {
                     onClick={() => router.push("/bookings/status")}
                     className="text-[10px] font-black uppercase tracking-widest border border-white/20 px-4 py-2 rounded-full hover:bg-white/10 transition-all active:scale-95"
                 >
-                    เช็คสถานะ
+                    CHECK STATUS
                 </button>
             </header>
 
@@ -764,7 +764,7 @@ export default function BookingPage() {
                                             </span>
                                         </div>
                                         <div className="flex justify-between items-center bg-white/10 p-4 rounded-2xl border border-white/10">
-                                            <span className="text-[9px] font-black text-green-400 uppercase tracking-widest">Deposit Due</span>
+                                            <span className="text-[9px] font-black text-green-400 uppercase tracking-widest">ค่ามัดจำ (Deposit Amount)</span>
                                             <span className="text-2xl font-black italic text-green-400">
                                                 {formatPrice(selectedService?.deposit_amount || 100)}
                                             </span>
@@ -787,33 +787,34 @@ export default function BookingPage() {
                                                 Bank Transfer
                                             </h3>
 
-                                            {/* QR Code with Logo Overlay */}
+                                            {/* QR Code (Clean, No Overlay) */}
                                             {activeBranch?.paymentQrUrl && (
-                                                <div className="mb-8 flex flex-col items-center">
-                                                    <div className="bg-white p-3 rounded-3xl shadow-lg relative">
-                                                        <img src={activeBranch.paymentQrUrl} className="w-48 h-48 object-cover rounded-xl" alt="Payment QR" />
-
-                                                        {/* Logo Overlay */}
-                                                        {activeBranch.logoSquareUrl && (
-                                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                                <div className="w-12 h-12 bg-white rounded-lg p-1 shadow-md">
-                                                                    <img src={activeBranch.logoSquareUrl} className="w-full h-full object-contain rounded-md" alt="Logo" />
-                                                                </div>
-                                                            </div>
-                                                        )}
+                                                <div className="mb-6 flex flex-col items-center">
+                                                    <div className="bg-white p-3 rounded-3xl shadow-lg">
+                                                        <img src={activeBranch.paymentQrUrl} className="w-56 h-56 object-cover rounded-xl" alt="Payment QR" />
                                                     </div>
                                                 </div>
                                             )}
 
-                                            <div className="text-center mb-8">
-                                                <div className="text-[10px] font-black text-blue-200 uppercase tracking-widest mb-1">Account Name</div>
-                                                <div className="font-black text-xl text-white tracking-wider">
-                                                    {activeBranch?.accountName || "StoryCut"}
+                                            {/* Account Info (Horizontal Row) */}
+                                            <div className="flex flex-col items-center gap-6 mb-8">
+                                                <div className="flex items-center gap-4 bg-white/10 rounded-2xl p-4 pr-6 border border-white/10">
+                                                    {activeBranch?.logoSquareUrl && (
+                                                        <div className="w-10 h-10 bg-white rounded-lg p-1 shadow-sm shrink-0 flex items-center justify-center">
+                                                            <img src={activeBranch.logoSquareUrl} className="w-full h-full object-contain rounded-md" alt="Logo" />
+                                                        </div>
+                                                    )}
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[8px] font-black text-blue-200 uppercase tracking-widest leading-none mb-1">Account Name</span>
+                                                        <span className="font-bold text-lg text-white leading-none">
+                                                            {activeBranch?.accountName || "StoryCut"}
+                                                        </span>
+                                                    </div>
                                                 </div>
 
-                                                <div className="mt-4 bg-white/10 rounded-xl p-3 inline-block px-6">
-                                                    <div className="text-[9px] font-black text-blue-200 uppercase tracking-widest mb-0.5">Deposit Amount</div>
-                                                    <div className="text-2xl font-black italic text-white">
+                                                <div className="bg-blue-500/50 rounded-xl p-3 px-6 border border-blue-400/30">
+                                                    <div className="text-[9px] font-black text-blue-100 uppercase tracking-widest mb-0.5 text-center">ค่ามัดจำ (Deposit Amount)</div>
+                                                    <div className="text-2xl font-black italic text-white text-center">
                                                         {formatPrice(selectedService?.deposit_amount || 100)}
                                                     </div>
                                                 </div>
