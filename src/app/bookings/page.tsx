@@ -384,7 +384,7 @@ export default function BookingPage() {
             });
 
             // Redirect to Status Page with Booking ID
-            router.push(`/bookings/status/${bookingId}`);
+            router.push(`/bookings/status/${bookingId}?new=true`);
         } catch (error) {
             console.error("Booking error:", error);
             alert("Booking failed. Please try again.");
